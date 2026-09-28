@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useUserId } from "@/lib/hooks";
 import type { AnswerContract } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +21,7 @@ interface Turn {
 }
 
 export default function CopilotPage() {
+  const userId = useUserId();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ export default function CopilotPage() {
     setTurns((t) => [...t, { role: "user", message }]);
     setLoading(true);
     try {
-      const answer = await api.chat(message);
+      const answer = await api.chat(message, userId);
       setTurns((t) => [...t, { role: "assistant", message, answer }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
