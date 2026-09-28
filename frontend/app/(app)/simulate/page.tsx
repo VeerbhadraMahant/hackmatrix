@@ -35,7 +35,10 @@ export default function SimulatePage() {
   const actionParams = useMemo(() => {
     if (scenario === "cancel_subscription") return { group_ids: activeGroupId ? [activeGroupId] : [] };
     if (scenario === "prepay_debt") return { debt_id: activeDebtId, extra_payment: extraAmount };
-    return { extra_monthly_amount: extraAmount };
+    // ActionType.increase_sip's handler (backend/app/simulate/engine.py
+    // _do_increase_sip) reads params["amount"], not "extra_monthly_amount" --
+    // sending the wrong key silently simulated a ₹0/month SIP increase.
+    return { amount: extraAmount };
   }, [scenario, activeGroupId, activeDebtId, extraAmount]);
 
   const canRun =
@@ -96,8 +99,11 @@ export default function SimulatePage() {
 
         {scenario === "prepay_debt" && (
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium text-ink">Debt</label>
+            <label htmlFor="simulate-debt-select" className="text-sm font-medium text-ink">
+              Debt
+            </label>
             <select
+              id="simulate-debt-select"
               className="rounded-chip border border-mist px-3 py-2 text-sm"
               value={activeDebtId ?? ""}
               onChange={(e) => setDebtId(e.target.value)}

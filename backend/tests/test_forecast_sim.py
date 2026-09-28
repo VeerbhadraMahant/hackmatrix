@@ -187,6 +187,23 @@ def test_every_action_returns_full_result(action):
     assert 0.0 <= result.health_score_after <= 100.0
 
 
+def test_build_emergency_fund_before_is_always_no_target_sentinel():
+    """Regression: the 'before' side of the emergency-fund impact estimate
+    must reflect the baseline (no dedicated contribution running -- target
+    never reached on its own), i.e. the 9999 sentinel, regardless of the
+    monthly_contribution proposed by this simulation. A previous version
+    computed a nonsensical (remaining + contribution) / contribution value
+    for 'before' instead."""
+    result = simulate(
+        ActionType.build_emergency_fund,
+        {"monthly_contribution": 3000, "target_amount": 100000, "current_saved": 10000},
+        current_forecast_inputs=_forecast_inputs(),
+        current_health_score=64.0,
+    )
+    assert result.impact.before == 9999.0
+    assert result.impact.after == pytest.approx(30.0, abs=0.01)
+
+
 def test_unknown_debt_raises_value_error():
     with pytest.raises(ValueError):
         simulate(

@@ -23,10 +23,16 @@ export function formatPercent(value: number): string {
  * score/rate/percent or whose magnitude is small (months, ratios, score
  * points) render as a plain number; everything else renders as currency.
  */
+// Word-boundary matches only -- "months"/"days" as a counted UNIT (e.g.
+// "Emergency fund months", "days until first gap") are plain numbers, but
+// "monthly" as an ADJECTIVE describing a rupee amount (e.g. "monthly free
+// cash flow", "monthly 'dining' spend") must still render as currency. A
+// plain substring check on "month" conflated these two and rendered rupee
+// amounts like "monthly free cash flow" as a bare number instead of ₹.
+const _PLAIN_NUMBER_METRIC_RE = /\b(score|rate|percent|months?|days?)\b/i;
+
 export function formatImpactValue(metric: string, value: number): string {
-  const lower = metric.toLowerCase();
-  const looksLikePlainNumber =
-    lower.includes("score") || lower.includes("rate") || lower.includes("percent") || lower.includes("month");
+  const looksLikePlainNumber = _PLAIN_NUMBER_METRIC_RE.test(metric);
   if (looksLikePlainNumber || Math.abs(value) < 50) {
     return Number.isInteger(value) ? value.toString() : value.toFixed(1);
   }
