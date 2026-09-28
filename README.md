@@ -7,7 +7,7 @@ An AI copilot that consolidates accounts, cards, loans, investments and transact
 - **Backend**: FastAPI (Python), Postgres via Supabase, Google Gemini (function calling) for the conversational copilot
 - **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS, Recharts
 - **Auth/DB**: Supabase (Google OAuth + Postgres + RLS)
-- **Design**: monochrome "Brex"-style system with a single Ember accent (see `/plans` for full token spec)
+- **Design**: monochrome "Brex"-style system with a single Ember accent (tokens in `frontend/app/globals.css`)
 
 ## Getting started
 
@@ -73,15 +73,21 @@ supabase/       SQL migrations (RLS-scoped per user)
   parsing, merchant categorization (rules + optional Gemini-embedding
   fallback), and synthetic 12-month transaction generators for 3 demo
   personas.
+- **Integration**: `/api/dashboard/{user_id}` and every other route compute
+  a real per-user snapshot from the database (accounts, transactions, debts)
+  end to end through analytics → forecast → recommend, cached in
+  `insights_snapshots` for before/after diffing. Unknown/unseeded users fall
+  back to a static fixture so the app never 500s. `/api/events/{user_id}`
+  persists a new transaction and returns a genuine before/after
+  `RecomputeDiff` (health score, forecast gap date, recommendation changes).
 
 ### Known gaps
-- The API layer currently serves a single fixture snapshot
-  (`demo_dashboard_snapshot`) rather than real per-user DB-backed state —
-  this is what the in-progress DB integration work replaces.
-- The 3 demo personas (below) exist as backend seed data and are directly
-  reachable via `user_id` on every API route (e.g.
-  `/api/dashboard/demo-arjun`), but the frontend has no persona switcher yet
-  — it always shows `demo-priya`.
+- The 3 demo personas (below) are reachable via `user_id` on every API
+  route (e.g. `/api/dashboard/demo-arjun`), but the frontend has no persona
+  switcher UI yet — it always shows `demo-priya`.
+- `/api/events` only supports adding a one-off transaction (`kind:
+  "transaction"`); adding a new income source or debt as a timeline event
+  isn't wired up yet.
 
 ## Demo personas
 Seeded via `python -m app.ingest.seed` (from `backend/`), each with 12 months
