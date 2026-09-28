@@ -7,9 +7,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
+from sqlmodel import Session
 
+from app.core.db import engine
 from app.ingest.fixtures import demo_dashboard_snapshot
+from app.ingest.upload import parse_transaction_csv
 from app.schemas import (
     AnswerContract,
     ChatRequest,
@@ -60,6 +63,45 @@ def simulate(user_id: str, req: SimulationRequest) -> SimulationResult:
         forecast_after=snap.forecast,
         impact=snap.insights.recommendations[0].impact if snap.insights.recommendations else None,
         confidence=0.5,
+    )
+
+
+@router.post("/upload/{user_id}", response_model=RecomputeDiff)
+async def upload_transactions(user_id: str, file: UploadFile) -> RecomputeDiff:
+    """Accepts a multipart bank-statement CSV, parses + categorizes it, and
+    persists the resulting transactions for `user_id`. account_id defaults to
+    a synthetic per-user "uploaded" account since bank CSV exports rarely
+    carry our internal account ids.
+
+    # TODO(analytics-agent): replace the stub RecomputeDiff below with a real
+    # before/after health-score + forecast recompute once
+    # app.analytics.health_score / app.forecast.cashflow exist. This route
+    # only handles ingestion + categorization + persistence for now.
+    """
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "uploaded file is empty")
+
+    account_id = f"acc-uploaded-{user_id}"
+    try:
+        rows = parse_transaction_csv(raw, user_id=user_id, account_id=account_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    with Session(engine) as session:
+        for row in rows:
+            session.add(row)
+        session.commit()
+
+    snap = demo_dashboard_snapshot(user_id)
+    return RecomputeDiff(
+        trigger="csv_upload",
+        health_score_before=snap.health_score.overall,
+        health_score_after=snap.health_score.overall,
+        narrative=(
+            f"Ingested {len(rows)} transactions from {file.filename or 'uploaded file'}. "
+            "Recompute pipeline not yet wired up -- health score/forecast diff is a stub."
+        ),
     )
 
 
