@@ -1,0 +1,40 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# node
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+*.db
+*.sqlite3
+
+# claude / docs (keep only the repo-root README.md)
+.claude/
+CLAUDE.md
+AGENTS.md
+**/*.md
+!/README.md
+
+# os
+.DS_Store
+Thumbs.db
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
