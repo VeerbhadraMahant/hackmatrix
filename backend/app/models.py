@@ -7,7 +7,7 @@ querying via SQLAlchemy with the service-role connection on the backend.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from sqlmodel import Field, SQLModel
 
@@ -27,7 +27,7 @@ class AccountRow(SQLModel, table=True):
     credit_limit: float | None = None
     interest_rate_apr: float | None = None
     currency: str = "INR"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TransactionRow(SQLModel, table=True):
@@ -43,7 +43,7 @@ class TransactionRow(SQLModel, table=True):
     description: str | None = None
     is_recurring: bool = False
     recurring_group_id: str | None = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class DebtRow(SQLModel, table=True):
@@ -90,7 +90,7 @@ class EventRow(SQLModel, table=True):
     user_id: str = Field(index=True)
     kind: str
     payload_json: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class InsightsSnapshotRow(SQLModel, table=True):
@@ -103,4 +103,4 @@ class InsightsSnapshotRow(SQLModel, table=True):
     user_id: str = Field(index=True)
     snapshot_json: str
     health_score: float
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
