@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
+import { useUserId } from "@/lib/hooks";
+import { DEMO_PERSONAS, setUserId } from "@/lib/user";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -12,6 +14,41 @@ const LINKS = [
   { href: "/simulate", label: "Simulate" },
   { href: "/timeline", label: "Timeline" },
 ];
+
+/** Segmented control for switching between the seeded demo personas. Calling
+ * setUserId() updates localStorage and fires USER_ID_CHANGE_EVENT, which
+ * useUserId() (lib/hooks.ts) picks up so every page currently mounted
+ * re-renders and refetches with the newly selected persona. */
+function PersonaSwitcher() {
+  const userId = useUserId();
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Demo persona"
+      className="flex items-center gap-0.5 rounded-chip border border-mist bg-paper p-0.5"
+    >
+      {DEMO_PERSONAS.map((persona) => {
+        const active = userId === persona.id;
+        return (
+          <button
+            key={persona.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => setUserId(persona.id)}
+            className={cn(
+              "rounded-chip px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+              active ? "bg-fog text-ink" : "text-graphite hover:text-ink"
+            )}
+          >
+            {persona.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function NavShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -40,6 +77,7 @@ export function NavShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+          <PersonaSwitcher />
           <SignInButton />
         </div>
       </header>

@@ -6,7 +6,7 @@ shapes (those are fixed in app.schemas).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from sqlmodel import Session, select
@@ -32,6 +32,18 @@ from app.simulate.engine import ForecastInputs, simulate
 router = APIRouter()
 
 _LIQUID_ACCOUNT_TYPES = {"checking", "savings"}
+
+# Typical interval (days) per frequency -- mirrors the buckets
+# app/analytics/recurring.py's detect_recurring() classifies into, so
+# backdated occurrences we synthesize below land in the same bucket the
+# detector would assign them.
+_FREQUENCY_INTERVAL_DAYS = {
+    "weekly": 7,
+    "biweekly": 14,
+    "monthly": 30,
+    "quarterly": 90,
+    "annual": 365,
+}
 
 
 def _starting_balance_for_user(user_id: str, session: Session) -> float:
@@ -225,6 +237,56 @@ def add_event(user_id: str, payload: dict) -> RecomputeDiff:
                     recurring_group_id=payload.get("recurring_group_id"),
                 )
             )
+        elif kind == "recurring":
+            # The frontend's "New recurring obligation" form (Timeline page)
+            # posts {merchant, amount, frequency, next_expected_date} -- this
+            # branch was previously missing entirely, so every submission
+            # 400'd. detect_recurring() (app/analytics/recurring.py) only
+            # surfaces a merchant once it has >= 3 historical occurrences, so
+            # a single future-dated row would be invisible to it; backdate 3
+            # occurrences at the chosen cadence instead, which makes the new
+            # obligation show up on the very next dashboard fetch exactly
+            # like every other recurring obligation.
+            amount = payload.get("amount")
+            if amount is None:
+                raise HTTPException(400, "recurring event requires 'amount'")
+            merchant = payload.get("merchant", "Manual entry")
+            frequency = payload.get("frequency", "monthly")
+            interval_days = _FREQUENCY_INTERVAL_DAYS.get(frequency, 30)
+            anchor_str = payload.get("next_expected_date")
+            anchor = (
+                datetime.strptime(anchor_str, "%Y-%m-%d").date()
+                if anchor_str
+                else datetime.now(timezone.utc).date()
+            )
+            # A recurring "obligation" is a commitment (rent, EMI,
+            # subscription, ...) -- always an outflow, regardless of the sign
+            # the caller passed in.
+            signed_amount = -abs(float(amount))
+            category = payload.get("category")
+            category_value = category if category else categorize(merchant, signed_amount).value
+            account_id = payload.get("account_id")
+            if not account_id:
+                checking = session.exec(
+                    select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
+                ).first()
+                account_id = checking.id if checking else f"acc-events-{user_id}"
+
+            group_id = f"rg-{merchant.strip().lower().replace(' ', '-')}"
+            for i in range(3, 0, -1):
+                session.add(
+                    TransactionRow(
+                        user_id=user_id,
+                        account_id=account_id,
+                        date=anchor - timedelta(days=interval_days * i),
+                        amount=signed_amount,
+                        merchant=merchant,
+                        category=category_value,
+                        description=payload.get("description"),
+                        is_recurring=True,
+                        recurring_group_id=group_id,
+                    )
+                )
         else:
             raise HTTPException(400, f"Unsupported event kind: {kind!r}")
 
