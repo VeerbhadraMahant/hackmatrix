@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, UploadFile
 from sqlmodel import Session
 
+from app.copilot.engine import answer as copilot_answer
 from app.core.config import get_settings
 from app.core.db import engine
 from app.forecast.alerts import maybe_send_gap_alert
@@ -20,7 +21,6 @@ from app.schemas import (
     AnswerContract,
     ChatRequest,
     DashboardSnapshot,
-    Fact,
     RecomputeDiff,
     SimulationRequest,
     SimulationResult,
@@ -67,15 +67,9 @@ def get_dashboard(user_id: str) -> DashboardSnapshot:
 
 @router.post("/chat", response_model=AnswerContract)
 def chat(req: ChatRequest) -> AnswerContract:
-    # TODO(copilot-agent): route through Gemini function-calling loop
-    # (app.copilot.engine.answer). Offline fallback lives there too.
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
-    return AnswerContract(
-        query=req.message,
-        narrative="Copilot engine not yet wired up -- this is a stub response.",
-        facts=[Fact(text="This is placeholder data from the Phase-0 stub API.")],
-    )
+    return copilot_answer(req.user_id, req.message)
 
 
 @router.post("/simulate/{user_id}", response_model=SimulationResult)

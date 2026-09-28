@@ -297,6 +297,9 @@ class RecomputeDiff(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    # Additive, backward-compatible: defaults to the demo persona so existing
+    # callers that don't send it keep working unchanged.
+    user_id: str = "demo-priya"
 
 
 ChatRole = Literal["user", "assistant"]
