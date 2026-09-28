@@ -27,6 +27,19 @@ export default function CopilotPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Switching persona via the NavShell switcher must not leave one persona's
+  // chat history mixed in with another's -- each persona starts a fresh
+  // conversation. Reset during render (React's recommended pattern for
+  // "state depends on a prop") rather than in an effect, which would cause
+  // an extra render with stale data flashing first.
+  const [lastUserId, setLastUserId] = useState(userId);
+  if (userId !== lastUserId) {
+    setLastUserId(userId);
+    setTurns([]);
+    setError(null);
+    setInput("");
+  }
+
   async function send(message: string) {
     if (!message.trim() || loading) return;
     setError(null);

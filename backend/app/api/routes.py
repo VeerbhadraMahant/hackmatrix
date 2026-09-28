@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, UploadFile
 from sqlmodel import Session, select
 
+from app.analytics.recurring import normalize_merchant
 from app.copilot.engine import answer as copilot_answer
 from app.core.config import get_settings
 from app.core.db import engine
@@ -198,6 +199,14 @@ def add_event(user_id: str, payload: dict) -> RecomputeDiff:
     """
     kind = payload.get("kind", "transaction")
 
+    def _default_checking_account(session: Session, account_id: str | None) -> str:
+        if account_id:
+            return account_id
+        checking = session.exec(
+            select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
+        ).first()
+        return checking.id if checking else f"acc-events-{user_id}"
+
     with Session(engine) as session:
         before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)
 
@@ -217,12 +226,7 @@ def add_event(user_id: str, payload: dict) -> RecomputeDiff:
                 if txn_date_str
                 else datetime.now(timezone.utc).date()
             )
-            account_id = payload.get("account_id")
-            if not account_id:
-                checking = session.exec(
-                    select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
-                ).first()
-                account_id = checking.id if checking else f"acc-events-{user_id}"
+            account_id = _default_checking_account(session, payload.get("account_id"))
 
             session.add(
                 TransactionRow(
@@ -265,14 +269,15 @@ def add_event(user_id: str, payload: dict) -> RecomputeDiff:
             signed_amount = -abs(float(amount))
             category = payload.get("category")
             category_value = category if category else categorize(merchant, signed_amount).value
-            account_id = payload.get("account_id")
-            if not account_id:
-                checking = session.exec(
-                    select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
-                ).first()
-                account_id = checking.id if checking else f"acc-events-{user_id}"
+            account_id = _default_checking_account(session, payload.get("account_id"))
 
-            group_id = f"rg-{merchant.strip().lower().replace(' ', '-')}"
+            # Use the same normalization detect_recurring() applies so a
+            # group id assigned here matches what recurring-detection would
+            # independently compute for the same merchant (previously this
+            # used a naive lower/replace that diverged from
+            # app.analytics.recurring.normalize_merchant, e.g. dropping
+            # trailing numeric IDs differently).
+            group_id = f"rg-{normalize_merchant(merchant).replace(' ', '-')}"
             for i in range(3, 0, -1):
                 session.add(
                     TransactionRow(

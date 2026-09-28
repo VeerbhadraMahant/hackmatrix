@@ -49,6 +49,21 @@ export default function SimulatePage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A subscription/debt picked for one persona doesn't exist (or means
+  // something different) for another -- switching via the NavShell persona
+  // switcher must not silently reuse a stale selection or a stale result
+  // from the previous persona's run. Reset during render (React's
+  // recommended pattern for "state depends on a prop") rather than in an
+  // effect, which would cause an extra render with stale data flashing first.
+  const [lastUserId, setLastUserId] = useState(userId);
+  if (userId !== lastUserId) {
+    setLastUserId(userId);
+    setGroupId(null);
+    setDebtId(null);
+    setResult(null);
+    setError(null);
+  }
+
   async function run() {
     setRunning(true);
     setError(null);

@@ -30,12 +30,16 @@ export function AnswerContractView({ answer }: { answer: AnswerContract }) {
           <ul className="flex flex-col gap-2">
             {facts.map((f, i) => {
               // Fact.text from the backend already narrates the number in
-              // context (currency, percent, score, or otherwise) -- only
-              // append a standalone value badge when the text doesn't
-              // already spell it out, to avoid misrendering e.g. a 0.12 rate
-              // as "₹0", or (the bug this guarded against) "Overall
-              // financial health score is 21/100." gaining a bogus "₹21".
-              const textAlreadyHasValue = /[₹%]|\bscore\b|\d+\s*\/\s*\d+/i.test(f.text);
+              // context (currency, percent, an "N/100" score, or otherwise)
+              // -- only append a standalone value badge when the text
+              // doesn't already spell it out, to avoid misrendering e.g. a
+              // 0.12 rate as "₹0", or (the bug this guarded against)
+              // "Overall financial health score is 21/100." gaining a bogus
+              // "₹21". Deliberately NOT matching a bare "score" mention --
+              // that would also suppress the badge for e.g. "Your credit
+              // score trend is improving" (value: 750), which never spells
+              // out the number in the text.
+              const textAlreadyHasValue = /[₹%]|\d+\s*\/\s*\d+/.test(f.text);
               return (
                 <li key={i} className="text-sm text-ink">
                   {f.text}
