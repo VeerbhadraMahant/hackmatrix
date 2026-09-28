@@ -48,6 +48,10 @@ class Settings:
     def has_supabase(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_role_key)
 
+    @property
+    def has_resend(self) -> bool:
+        return bool(self.resend_api_key)
+
 
 @lru_cache
 def get_settings() -> Settings:
