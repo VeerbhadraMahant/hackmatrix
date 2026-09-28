@@ -298,9 +298,12 @@ def _do_build_emergency_fund(inputs: ForecastInputs, params: dict, health_before
     # capped modestly, rather than penalising the score for saving money.
     health_after = _approx_health_delta(abs(monthly_contribution) * 0.3, health_before)
 
+    # "before" reflects the baseline with no dedicated fund contribution
+    # running at all, i.e. the target is never reached on its own -- always
+    # the sentinel, regardless of what contribution this simulation proposes.
     impact = ImpactEstimate(
         metric="months to reach emergency-fund target",
-        before=_NO_TARGET_SENTINEL if monthly_contribution <= 0 else round((remaining + monthly_contribution) / max(monthly_contribution, 1), 2),
+        before=_NO_TARGET_SENTINEL,
         after=round(months_to_target, 2),
         delta=round(months_to_target, 2) if monthly_contribution > 0 else 0.0,
         horizon="until target reached",
