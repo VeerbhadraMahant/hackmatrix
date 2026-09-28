@@ -35,10 +35,18 @@ export default function TimelinePage() {
     setError(null);
     setDiff(null);
     try {
+      // The amount field asks "how much", not a signed value -- but the
+      // backend's TransactionRow.amount convention is signed (negative =
+      // outflow, see backend/app/api/routes.py add_event()). Both event
+      // kinds here are spend/obligations (a bill, a subscription, an
+      // unplanned purchase), never income, so always send it as an outflow;
+      // without this, adding e.g. "Emergency Vet Bill" was posted as income
+      // and made the health score go UP.
+      const signedAmount = -Math.abs(amount);
       const payload =
         kind === "transaction"
-          ? { kind: "transaction", merchant, amount, date }
-          : { kind: "recurring", merchant, amount, frequency, next_expected_date: date };
+          ? { kind: "transaction", merchant, amount: signedAmount, date }
+          : { kind: "recurring", merchant, amount: signedAmount, frequency, next_expected_date: date };
       const result = await api.addEvent(userId, payload);
       setDiff(result);
     } catch (err) {
