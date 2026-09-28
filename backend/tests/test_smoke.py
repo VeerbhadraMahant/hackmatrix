@@ -4,8 +4,14 @@ simulate/, copilot/) added by the background agents.
 """
 from fastapi.testclient import TestClient
 
+from app.core.db import init_db
 from app.main import app
 
+# Ensure tables exist even if this module's TestClient never triggers
+# FastAPI's lifespan (plain `TestClient(app)` without `with` doesn't run
+# startup events) -- needed now that /api/dashboard queries the DB for real
+# instead of only ever returning a static fixture. init_db() is idempotent.
+init_db()
 client = TestClient(app)
 
 

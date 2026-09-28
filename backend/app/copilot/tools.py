@@ -8,16 +8,18 @@ Every function here:
     {"error": "...", "data_gap": "..."} shaped info instead, so callers can
     surface a DataGap rather than crashing or hallucinating.
 
-Data source: for now every tool reads from
-`app.ingest.fixtures.demo_dashboard_snapshot(user_id)`. This is intentionally
-the ONLY place that touches the fixture -- swapping in real per-user DB state
-later (once data-agent/analytics-agent land) is a one-line change per
-function (replace the `_snapshot(user_id)` call with a real query).
+Data source: every tool reads via `_snapshot(user_id)`, which builds a real
+per-user DashboardSnapshot from the DB (app.ingest.snapshot), falling back to
+the Phase-0 fixture on any error so the copilot never crashes/hallucinates
+from a half-broken DB state. This is intentionally the ONLY place that
+touches persistence -- every function above stays pure plain-dict-in,
+plain-dict-out.
 """
 from __future__ import annotations
 
 from datetime import date, timedelta
 
+from app.core.db import engine
 from app.ingest.fixtures import demo_dashboard_snapshot
 from app.schemas import ActionType
 
@@ -25,14 +27,39 @@ from app.schemas import ActionType
 def _snapshot(user_id: str):
     """Single seam for swapping fixture data -> real per-user data later.
 
-    Never raises: the fixture generator is deterministic/synthetic today, but
-    once this reads a real DB this is where a missing-user lookup would be
-    caught and turned into a data-gap-shaped None instead of an exception.
+    Never raises: any DB/query error falls back to the deterministic fixture
+    so a broken DB never turns into a copilot crash or hallucinated answer.
     """
     try:
-        return demo_dashboard_snapshot(user_id)
-    except Exception as exc:  # pragma: no cover - fixture is currently infallible
-        return None
+        from sqlmodel import Session
+
+        from app.ingest.snapshot import build_dashboard_snapshot
+
+        with Session(engine) as session:
+            return build_dashboard_snapshot(user_id, session)
+    except Exception:
+        try:
+            return demo_dashboard_snapshot(user_id)
+        except Exception:  # pragma: no cover - fixture is currently infallible
+            return None
+
+
+def _starting_balance(user_id: str) -> float:
+    """Real checking+savings balance for `user_id` (see
+    app.ingest.snapshot module docstring for the liquid-balance rule);
+    falls back to the Phase-0 fixture constant for unknown/fixture users."""
+    try:
+        from sqlmodel import Session, select
+
+        from app.models import AccountRow
+
+        with Session(engine) as session:
+            accounts = session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).all()
+            if accounts:
+                return float(sum(a.balance for a in accounts if a.type in ("checking", "savings")))
+    except Exception:
+        pass
+    return 42_000.0
 
 
 def get_summary(user_id: str) -> dict:
@@ -260,10 +287,8 @@ def simulate_action(user_id: str, action: str, action_params: dict = {}) -> dict
     try:
         from app.simulate.engine import ForecastInputs, simulate as real_simulate  # type: ignore
 
-        # TODO(integration): duplicates routes.py's _forecast_inputs_from_snapshot;
-        # de-dupe into a shared helper once DB-backed per-user state lands.
         inputs = ForecastInputs(
-            starting_balance=42_000.0,
+            starting_balance=_starting_balance(user_id),
             recurring=snap.recurring_obligations,
             debts=snap.debts,
             transactions=None,
