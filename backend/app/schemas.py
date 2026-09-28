@@ -122,6 +122,19 @@ class RecurringObligation(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+class Goal(BaseModel):
+    """Mirrors models.GoalRow. Added by analytics-agent for goal-progress
+    projection (app.analytics.goals) -- new shape, does not alter any
+    existing contract."""
+
+    id: str
+    user_id: str
+    name: str
+    target_amount: float
+    target_date: Optional[date] = None
+    current_amount: float = 0
+
+
 # ---------------------------------------------------------------------------
 # Health score
 # ---------------------------------------------------------------------------
