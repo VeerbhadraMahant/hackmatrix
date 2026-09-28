@@ -42,7 +42,16 @@ def trailing_savings_rate(df: pd.DataFrame, months: int, as_of: date | None = No
     as_of_ts = pd.Timestamp(as_of) if as_of is not None else work["date"].max()
     window_start = as_of_ts - pd.DateOffset(months=months)
     window = work[(work["date"] > window_start) & (work["date"] <= as_of_ts)]
-    window = window[window["category"] != TxnCategory.transfer.value]
+    # Exclude transfers between the user's own accounts, AND credit-card bill
+    # payments: a CC bill payment moves cash from checking to pay off charges
+    # that were already counted as spend (dining/shopping/etc.) at the time
+    # they were made, so including it too double-counts that spend. (Bug
+    # found during integration: real persona data has both the original
+    # credit-card purchase AND the monthly bill-payment transaction, which
+    # without this exclusion pushed several personas' savings rate strongly
+    # negative even though their discretionary spend alone was reasonable.)
+    _excluded = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value}
+    window = window[~window["category"].isin(_excluded)]
 
     income_total = window.loc[window["amount"] > 0, "amount"].sum()
     expense_total = -window.loc[window["amount"] < 0, "amount"].sum()

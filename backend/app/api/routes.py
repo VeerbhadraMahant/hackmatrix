@@ -5,18 +5,20 @@ shapes (those are fixed in app.schemas).
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, UploadFile
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.copilot.engine import answer as copilot_answer
 from app.core.config import get_settings
 from app.core.db import engine
 from app.forecast.alerts import maybe_send_gap_alert
-from app.ingest.fixtures import demo_dashboard_snapshot
+from app.ingest.categorize import categorize
+from app.ingest.snapshot import build_dashboard_snapshot, get_last_snapshot
 from app.ingest.upload import parse_transaction_csv
-from app.recommend.engine import generate_recommendations
+from app.models import AccountRow, EventRow, TransactionRow
 from app.schemas import (
     AnswerContract,
     ChatRequest,
@@ -29,20 +31,25 @@ from app.simulate.engine import ForecastInputs, simulate
 
 router = APIRouter()
 
+_LIQUID_ACCOUNT_TYPES = {"checking", "savings"}
 
-def _forecast_inputs_from_snapshot(snap: DashboardSnapshot) -> ForecastInputs:
-    """Build simulate.engine.ForecastInputs from a DashboardSnapshot.
 
-    # TODO(integration): once analytics-agent/data-agent's DB-backed state
-    # is available, replace `demo_dashboard_snapshot(user_id)` call sites
-    # below with a real per-user snapshot builder and pass real transaction
-    # history through `transactions=` here instead of leaving it None.
-    """
-    # crude starting balance estimate: net worth minus debt principal, since
-    # DashboardSnapshot doesn't expose a dedicated checking balance field.
-    # TODO(integration): replace with the user's actual checking account
-    # balance once Account records are wired through.
-    starting_balance = 42_000.0
+def _starting_balance_for_user(user_id: str, session: Session) -> float:
+    """Real starting balance: sum of the user's checking+savings account
+    balances (see app.ingest.snapshot module docstring for the rationale).
+    Recomputed here directly from Account rows (rather than stashed on
+    DashboardSnapshot, which has no dedicated field for it) so this stays a
+    single source of truth shared with build_dashboard_snapshot."""
+    accounts = session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).all()
+    if not accounts:
+        return 42_000.0  # fixture-fallback users have no Account rows
+    return float(sum(a.balance for a in accounts if a.type in _LIQUID_ACCOUNT_TYPES))
+
+
+def _forecast_inputs_from_snapshot(snap: DashboardSnapshot, user_id: str, session: Session) -> ForecastInputs:
+    """Build simulate.engine.ForecastInputs from a DashboardSnapshot plus a
+    real starting balance looked up from the DB."""
+    starting_balance = _starting_balance_for_user(user_id, session)
     return ForecastInputs(
         starting_balance=starting_balance,
         recurring=snap.recurring_obligations,
@@ -60,9 +67,8 @@ def health_check() -> dict:
 
 @router.get("/dashboard/{user_id}", response_model=DashboardSnapshot)
 def get_dashboard(user_id: str) -> DashboardSnapshot:
-    # TODO(analytics-agent): replace with real computation from DB via
-    # app.analytics.health_score + app.forecast.cashflow
-    return demo_dashboard_snapshot(user_id)
+    with Session(engine) as session:
+        return build_dashboard_snapshot(user_id, session)
 
 
 @router.post("/chat", response_model=AnswerContract)
@@ -74,11 +80,9 @@ def chat(req: ChatRequest) -> AnswerContract:
 
 @router.post("/simulate/{user_id}", response_model=SimulationResult)
 def run_simulation(user_id: str, req: SimulationRequest) -> SimulationResult:
-    # TODO(integration): demo_dashboard_snapshot is a Phase-0 fixture stand-in
-    # for real per-user DB state; swap for a real snapshot builder once
-    # data-agent/analytics-agent land.
-    snap = demo_dashboard_snapshot(user_id)
-    inputs = _forecast_inputs_from_snapshot(snap)
+    with Session(engine) as session:
+        snap = build_dashboard_snapshot(user_id, session)
+        inputs = _forecast_inputs_from_snapshot(snap, user_id, session)
     try:
         return simulate(
             req.action,
@@ -97,10 +101,9 @@ async def upload_transactions(user_id: str, file: UploadFile) -> RecomputeDiff:
     a synthetic per-user "uploaded" account since bank CSV exports rarely
     carry our internal account ids.
 
-    # TODO(analytics-agent): replace the stub RecomputeDiff below with a real
-    # before/after health-score + forecast recompute once
-    # app.analytics.health_score / app.forecast.cashflow exist. This route
-    # only handles ingestion + categorization + persistence for now.
+    Returns a real before/after RecomputeDiff: "before" is whatever snapshot
+    was last cached for this user (or a freshly computed one if none was
+    cached yet), "after" is recomputed post-ingest.
     """
     raw = await file.read()
     if not raw:
@@ -113,51 +116,124 @@ async def upload_transactions(user_id: str, file: UploadFile) -> RecomputeDiff:
         raise HTTPException(400, str(exc)) from exc
 
     with Session(engine) as session:
+        before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)
+
         for row in rows:
             session.add(row)
         session.commit()
 
-    snap = demo_dashboard_snapshot(user_id)
+        after = build_dashboard_snapshot(user_id, session)
+
+    return _build_recompute_diff(trigger="csv_upload", before=before, after=after,
+                                  extra_narrative=f"Ingested {len(rows)} transactions from {file.filename or 'uploaded file'}.")
+
+
+def _build_recompute_diff(*, trigger: str, before: DashboardSnapshot, after: DashboardSnapshot,
+                           extra_narrative: str = "") -> RecomputeDiff:
+    """Diff two DashboardSnapshots into a RecomputeDiff: which recommended
+    actions are new, which are no longer recommended, and how the headline
+    numbers (health score, first cash-flow gap) moved."""
+    before_actions = {r.action for r in before.insights.recommendations}
+    after_by_action = {r.action: r for r in after.insights.recommendations}
+
+    new_recommendations = [r for r in after.insights.recommendations if r.action not in before_actions]
+    removed_actions = [a for a in before_actions if a not in after_by_action]
+
+    delta = after.health_score.overall - before.health_score.overall
+    narrative_parts = [extra_narrative] if extra_narrative else []
+    if abs(delta) < 0.05:
+        narrative_parts.append(f"Health score is essentially unchanged ({after.health_score.overall:.1f}).")
+    else:
+        direction = "improved" if delta > 0 else "declined"
+        narrative_parts.append(
+            f"Health score {direction} from {before.health_score.overall:.1f} to "
+            f"{after.health_score.overall:.1f} ({delta:+.1f})."
+        )
+    if before.forecast.first_gap_date != after.forecast.first_gap_date:
+        narrative_parts.append(
+            f"Projected cash-flow gap date moved from {before.forecast.first_gap_date} to "
+            f"{after.forecast.first_gap_date}."
+        )
+    if new_recommendations:
+        narrative_parts.append(f"{len(new_recommendations)} new recommendation(s) surfaced.")
+    if removed_actions:
+        narrative_parts.append(f"{len(removed_actions)} recommendation(s) are no longer relevant.")
+
     return RecomputeDiff(
-        trigger="csv_upload",
-        health_score_before=snap.health_score.overall,
-        health_score_after=snap.health_score.overall,
-        narrative=(
-            f"Ingested {len(rows)} transactions from {file.filename or 'uploaded file'}. "
-            "Recompute pipeline not yet wired up -- health score/forecast diff is a stub."
-        ),
+        trigger=trigger,
+        health_score_before=before.health_score.overall,
+        health_score_after=after.health_score.overall,
+        forecast_first_gap_before=before.forecast.first_gap_date,
+        forecast_first_gap_after=after.forecast.first_gap_date,
+        new_recommendations=new_recommendations,
+        removed_recommendation_actions=removed_actions,
+        narrative=" ".join(narrative_parts),
     )
 
 
 @router.post("/events/{user_id}", response_model=RecomputeDiff)
 def add_event(user_id: str, payload: dict) -> RecomputeDiff:
-    # TODO(analytics-agent + forecast-sim-agent): persist event, recompute
-    # snapshot, diff against last insights_snapshots row. For now this
-    # recomputes recommendations against the fixture snapshot so the diff
-    # shape is real even though the "event" itself isn't yet persisted.
-    snap = demo_dashboard_snapshot(user_id)
-    inputs = _forecast_inputs_from_snapshot(snap)
-    new_recs = generate_recommendations(
-        recurring=snap.recurring_obligations,
-        debts=snap.debts,
-        health_score=snap.health_score,
-        forecast=snap.forecast,
-        forecast_inputs=inputs,
-    )
-    return RecomputeDiff(
-        trigger=payload.get("kind", "unknown"),
-        health_score_before=snap.health_score.overall,
-        health_score_after=snap.health_score.overall,
-        forecast_first_gap_before=snap.forecast.first_gap_date,
-        forecast_first_gap_after=snap.forecast.first_gap_date,
-        new_recommendations=new_recs,
-        narrative=(
-            "Recompute pipeline is wired to the real recommendation engine, "
-            "but event persistence and true before/after diffing depend on "
-            "data-agent/analytics-agent DB integration -- this response "
-            "recomputes recommendations against the current fixture snapshot."
-        ),
-    )
+    """Persist a new event (transaction, income, or debt) for `user_id`, then
+    recompute the dashboard snapshot before vs. after so the UI can show
+    exactly how recommendations/health score/forecast changed.
+
+    Expected payload shapes (all keyed by "kind"):
+      {"kind": "transaction", "amount": -450, "merchant": "...",
+       "category": "dining" (optional -- categorized if omitted),
+       "date": "2026-09-29" (optional -- defaults to today),
+       "account_id": "..." (optional -- defaults to the user's first
+       checking account, or a synthetic "acc-events-{user_id}")}
+    """
+    kind = payload.get("kind", "transaction")
+
+    with Session(engine) as session:
+        before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)
+
+        if kind == "transaction":
+            amount = payload.get("amount")
+            if amount is None:
+                raise HTTPException(400, "transaction event requires 'amount'")
+            merchant = payload.get("merchant", "Manual entry")
+            category = payload.get("category")
+            if category:
+                category_value = category
+            else:
+                category_value = categorize(merchant, float(amount)).value
+            txn_date_str = payload.get("date")
+            txn_date = (
+                datetime.strptime(txn_date_str, "%Y-%m-%d").date()
+                if txn_date_str
+                else datetime.now(timezone.utc).date()
+            )
+            account_id = payload.get("account_id")
+            if not account_id:
+                checking = session.exec(
+                    select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
+                ).first()
+                account_id = checking.id if checking else f"acc-events-{user_id}"
+
+            session.add(
+                TransactionRow(
+                    user_id=user_id,
+                    account_id=account_id,
+                    date=txn_date,
+                    amount=float(amount),
+                    merchant=merchant,
+                    category=category_value,
+                    description=payload.get("description"),
+                    is_recurring=bool(payload.get("is_recurring", False)),
+                    recurring_group_id=payload.get("recurring_group_id"),
+                )
+            )
+        else:
+            raise HTTPException(400, f"Unsupported event kind: {kind!r}")
+
+        session.add(EventRow(user_id=user_id, kind=kind, payload_json=json.dumps(payload, default=str)))
+        session.commit()
+
+        after = build_dashboard_snapshot(user_id, session)
+
+    return _build_recompute_diff(trigger=kind, before=before, after=after)
 
 
 @router.post("/alerts/gap/{user_id}")
@@ -173,8 +249,7 @@ def send_gap_alert(user_id: str, payload: dict) -> dict:
     if not user_email:
         raise HTTPException(400, "payload must include 'email'")
 
-    # TODO(integration): replace with a real per-user forecast once
-    # DB-backed state is available.
-    snap = demo_dashboard_snapshot(user_id)
+    with Session(engine) as session:
+        snap = build_dashboard_snapshot(user_id, session)
     sent = maybe_send_gap_alert(user_email, snap.forecast)
     return {"sent": sent}
