@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { getUserId } from "@/lib/user";
+import { getUserId, USER_ID_CHANGE_EVENT } from "@/lib/user";
 
-function subscribeNever() {
-  // The demo user id never changes from outside this tab during a session.
-  return () => {};
+function subscribeToUserIdChanges(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(USER_ID_CHANGE_EVENT, onStoreChange);
+  return () => window.removeEventListener(USER_ID_CHANGE_EVENT, onStoreChange);
 }
 
 /**
  * Returns the current demo/real user id. Uses useSyncExternalStore so the
  * server snapshot (SSR: no localStorage) and client snapshot can differ
  * without triggering the "setState inside effect" lint rule or a hydration
- * mismatch warning -- the id itself is never rendered into DOM text.
+ * mismatch warning -- the id itself is never rendered into DOM text. The
+ * persona switcher (components/NavShell.tsx) calls setUserId(), which
+ * dispatches USER_ID_CHANGE_EVENT so every subscriber here re-renders with
+ * the new id -- and any useAsync() keyed on userId refetches automatically.
  */
 export function useUserId(): string {
-  return useSyncExternalStore(subscribeNever, getUserId, () => "demo-priya");
+  return useSyncExternalStore(subscribeToUserIdChanges, getUserId, () => "demo-priya");
 }
 
 interface AsyncState<T> {
