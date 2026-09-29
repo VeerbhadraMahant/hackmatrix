@@ -359,7 +359,9 @@ def _do_affordability_check(inputs: ForecastInputs, params: dict, health_before:
 
     health_after = health_before  # affordability check is informational, not a real action
     impact = ImpactEstimate(
-        metric="first cash-flow gap date (days from today, 9999 = none in horizon)",
+        # User-facing label -- keep it free of internal sentinel/implementation
+        # details (the 9999 "no gap" placeholder used for before/after below).
+        metric="days until projected cash-flow gap",
         before=(forecast_before.first_gap_date - datetime.now(timezone.utc).date()).days if forecast_before.first_gap_date else 9999,
         after=(forecast_after.first_gap_date - datetime.now(timezone.utc).date()).days if forecast_after.first_gap_date else 9999,
         delta=(

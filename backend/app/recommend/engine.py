@@ -52,11 +52,19 @@ def _candidate_requests(
     # is available, use it to pick which debt(s) to prioritise (avalanche
     # order) instead of proposing all of them.
     for debt in debts:
+        # Debt has no human-readable name in the contract (only ids) -- describe
+        # it by its salient numbers so recommendation text never surfaces a raw
+        # UUID to the user.
+        debt_label = f"your {debt.interest_rate_apr:.1f}% APR debt (₹{debt.principal:,.0f})"
         candidates.append(
             (
                 ActionType.prepay_debt,
-                {"debt_id": debt.id, "extra_payment": round(ten_pct_fcf, 2)},
-                f"Debt on {debt.id} carries {debt.interest_rate_apr:.1f}% APR; "
+                {
+                    "debt_id": debt.id,
+                    "debt_label": debt_label,
+                    "extra_payment": round(ten_pct_fcf, 2),
+                },
+                f"{debt_label.capitalize()} carries a high rate; "
                 f"extra principal payments compound in your favour fastest "
                 f"on your highest-rate debt.",
             )
@@ -153,9 +161,10 @@ def generate_recommendations(
 def _describe(action: ActionType, params: dict, result) -> str:
     impact = result.impact
     if action == ActionType.prepay_debt:
+        debt_label = params.get("debt_label") or f"debt {params.get('debt_id')}"
         return (
-            f"Pay an extra {params.get('extra_payment', 0):.0f}/month toward "
-            f"{params.get('debt_id')} -- saves ~{abs(impact.delta):.0f} in interest."
+            f"Pay an extra ₹{params.get('extra_payment', 0):.0f}/month toward "
+            f"{debt_label} -- saves ~₹{abs(impact.delta):.0f} in interest."
         )
     if action == ActionType.cancel_subscription:
         return (
