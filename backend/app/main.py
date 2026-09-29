@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.budgets_router import router as budgets_router
 from app.api.routes import router
+from app.api.transactions_router import router as transactions_router
 from app.core.audit import log_audit_event
 from app.core.db import init_db
 
@@ -39,6 +41,8 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+app.include_router(transactions_router, prefix="/api")
+app.include_router(budgets_router, prefix="/api")
 
 
 @app.middleware("http")
@@ -57,8 +61,16 @@ async def audit_log_middleware(request: Request, call_next):
 
     def _guess_user_id() -> str | None:
         parts = [p for p in path.split("/") if p]
-        # /api/dashboard/{user_id}, /api/simulate/{user_id}, etc.
-        if len(parts) >= 3 and parts[0] == "api" and parts[1] in {"dashboard", "simulate", "upload", "events", "alerts"}:
+        if len(parts) < 3 or parts[0] != "api":
+            return None
+        # user_id is always the 3rd segment for these resources (even when
+        # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
+        # or /api/transactions/{user_id}/{transaction_id}).
+        if parts[1] in {"transactions", "budgets"}:
+            return parts[2]
+        # For these, user_id is the LAST segment (/api/dashboard/{user_id},
+        # /api/alerts/gap/{user_id}, etc.).
+        if parts[1] in {"dashboard", "simulate", "upload", "events", "alerts"}:
             return parts[-1]
         return None
 
