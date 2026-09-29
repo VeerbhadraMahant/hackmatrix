@@ -254,6 +254,18 @@ class SimulationResult(BaseModel):
     forecast_after: CashFlowForecast
     impact: ImpactEstimate
     confidence: float = Field(ge=0, le=1)
+    # Added by simulate-upgrades-agent: explicit minimum-balance guard (upgrade 1).
+    # `breaches_minimum_balance` is True when `forecast_after`'s P50 path dips
+    # below the caller's `ForecastInputs.minimum_balance_to_keep` at any point
+    # in the horizon. Defaults to False/None for every existing action type
+    # and every existing caller that doesn't configure a buffer.
+    breaches_minimum_balance: bool = False
+    min_balance_date: Optional[date] = None
+    # Added by simulate-upgrades-agent: multi-strategy affordability (upgrade 2).
+    # Populated only for the `affordability_check` action; every other action
+    # type leaves this None. Each dict has the shape produced by
+    # `app.simulate.engine.evaluate_affordability_strategies`.
+    affordability_strategies: Optional[list[dict]] = None
 
 
 # ---------------------------------------------------------------------------

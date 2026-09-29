@@ -55,6 +55,10 @@ class ForecastInputs:
     transactions: Optional[pd.DataFrame] = None
     horizon_days: int = _DEFAULT_HORIZON_DAYS
     monthly_income: float = 0.0
+    # Upgrade 1 (simulate-upgrades-agent): the user's personal safety buffer.
+    # 0.0 (default) means "just don't go negative" -- any positive value
+    # means "never let a simulated action's forecast dip below this amount".
+    minimum_balance_to_keep: float = 0.0
 
 
 def _forecast_from(inputs: ForecastInputs, recurring_override: Optional[list[RecurringObligation]] = None,
@@ -117,6 +121,28 @@ def _find_debt(debts: list[Debt], debt_id: str) -> Optional[Debt]:
         if d.id == debt_id:
             return d
     return None
+
+
+# ---------------------------------------------------------------------------
+# Upgrade 1: explicit minimum-balance guard.
+# ---------------------------------------------------------------------------
+
+
+def _minimum_balance_breach(
+    forecast: CashFlowForecast, minimum_balance_to_keep: float
+) -> tuple[bool, Optional[date]]:
+    """Does `forecast`'s P50 (median) path dip below `minimum_balance_to_keep`
+    at any point in the horizon? We deliberately check P50, not P10 -- P10 is
+    already a pessimistic tail, so guarding on it would flag almost every
+    action as unsafe. P50 is the "expected" path, so breaching it is a
+    meaningful, actionable warning rather than noise.
+
+    Returns (breaches, first_date_of_breach_or_None). Never raises.
+    """
+    for point in forecast.points:
+        if point.p50 < minimum_balance_to_keep:
+            return True, point.date
+    return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +378,15 @@ def _do_affordability_check(inputs: ForecastInputs, params: dict, health_before:
             confidence=1.0,
         )
         forecast_after = _forecast_from(inputs, recurring_override=inputs.recurring + [new_item])
+        strategies: list[dict] = []  # recurring commitments don't fit the one-time-purchase strategies below
     else:
         forecast_after = _forecast_from(inputs, starting_balance_override=inputs.starting_balance - amount)
+        strategies = evaluate_affordability_strategies(
+            amount,
+            label,
+            forecast_inputs=inputs,
+            installment_months=int(params.get("installment_months", 3)),
+        )
 
     can_afford = forecast_after.first_gap_date is None
 
@@ -371,7 +404,192 @@ def _do_affordability_check(inputs: ForecastInputs, params: dict, health_before:
         ),
         horizon=f"next {inputs.horizon_days} days",
     )
-    return forecast_after, health_after, impact, can_afford
+    return forecast_after, health_after, impact, {"can_afford": can_afford, "strategies": strategies}
+
+
+# ---------------------------------------------------------------------------
+# Upgrade 2: multi-strategy affordability.
+# ---------------------------------------------------------------------------
+
+
+def evaluate_affordability_strategies(
+    amount: float,
+    description: str,
+    *,
+    forecast_inputs: ForecastInputs,
+    installment_months: int = 3,
+) -> list[dict]:
+    """Return several ranked ways to afford `amount`, each carrying its own
+    safety evaluation against `forecast_inputs.minimum_balance_to_keep`.
+
+    Every strategy's safety check is derived from the SAME baseline P50 path
+    (`base_p50`), computed once, because paying a lump sum on day t is
+    mathematically just "subtract the lump from every day's balance from t
+    onward" -- no need to re-run the forecast per candidate day.
+
+    Ranking (documented tie-break, mirrors Penny's lexicographic approach):
+      1. `pay_in_full_now` always sorts first if it is safe -- it fully
+         resolves the purchase today with zero ongoing modification to the
+         user's cash flow.
+      2. Otherwise, rank by (days_until_purchase_is_effectively_made,
+         number_of_plan_modifications) ascending -- i.e. prefer whichever
+         safe option gets the purchase done soonest, and among options that
+         get it done on the same day, prefer the one that changes fewest
+         future obligations. `installments` and `partial_now_deferred` both
+         "start" the purchase today (offset 0) but carry 1 and 2
+         modifications respectively; `wait_until_safe` delays the purchase
+         itself, so its offset is however many days out the safe date is.
+    """
+    today = datetime.now(timezone.utc).date()
+    buffer = forecast_inputs.minimum_balance_to_keep
+
+    baseline_forecast = _forecast_from(forecast_inputs)
+    base_p50 = [p.p50 for p in baseline_forecast.points]
+    horizon = len(base_p50)
+
+    def _min_from(idx: int, offset: float) -> float:
+        """Minimum P50 balance from day `idx` to the end of the horizon,
+        after subtracting a constant `offset` (a lump paid at/behore idx)."""
+        if idx >= horizon:
+            return base_p50[-1] - offset if base_p50 else 0.0
+        return min(base_p50[idx:]) - offset
+
+    strategies: list[dict] = []
+
+    # --- pay_in_full_now ----------------------------------------------------
+    full_min = _min_from(0, amount)
+    full_safe = full_min >= buffer
+    if full_safe:
+        strategies.append(
+            {
+                "strategy": "pay_in_full_now",
+                "safe": True,
+                "date": today.isoformat(),
+                "amount_paid_now": round(amount, 2),
+                "amount_deferred": 0.0,
+                "min_balance_after": round(full_min, 2),
+                "note": f"Pay the full ₹{amount:,.0f} for {description} today.",
+                "_rank_key": (0, 0),
+            }
+        )
+
+    # --- installments --------------------------------------------------------
+    if installment_months > 0:
+        monthly_installment = amount / installment_months
+        installment_item = RecurringObligation(
+            group_id="sim-affordability-installments",
+            merchant=f"Installment: {description}",
+            category=TxnCategory.other,
+            amount=-monthly_installment,
+            frequency=RecurrenceFrequency.monthly,
+            next_expected_date=today + timedelta(days=30),
+            confidence=1.0,
+        )
+        installment_forecast = _forecast_from(
+            forecast_inputs, recurring_override=forecast_inputs.recurring + [installment_item]
+        )
+        installment_min = min((p.p50 for p in installment_forecast.points), default=0.0)
+        installment_safe = installment_min >= buffer
+        if installment_safe:
+            strategies.append(
+                {
+                    "strategy": "installments",
+                    "safe": True,
+                    "date": today.isoformat(),
+                    "amount_paid_now": 0.0,
+                    "amount_deferred": round(amount, 2),
+                    "installment_amount": round(monthly_installment, 2),
+                    "installment_months": installment_months,
+                    "min_balance_after": round(installment_min, 2),
+                    "note": (
+                        f"Spread ₹{amount:,.0f} for {description} over "
+                        f"{installment_months} monthly installments of "
+                        f"₹{monthly_installment:,.0f}, starting next month."
+                    ),
+                    "_rank_key": (0, 1),
+                }
+            )
+
+    # --- partial_now_deferred -------------------------------------------------
+    half = amount / 2.0
+    half_min = _min_from(0, half)
+    half_safe = half_min >= buffer
+    if half_safe:
+        deferred_date: Optional[date] = None
+        for idx in range(horizon):
+            if _min_from(idx, half) >= buffer:
+                deferred_date = today + timedelta(days=idx)
+                break
+        strategies.append(
+            {
+                "strategy": "partial_now_deferred",
+                "safe": True,
+                "date": today.isoformat(),
+                "amount_paid_now": round(half, 2),
+                "amount_deferred": round(half, 2),
+                "deferred_payment_date": deferred_date.isoformat() if deferred_date else None,
+                "min_balance_after": round(half_min, 2),
+                "note": (
+                    f"Pay ₹{half:,.0f} now toward {description}; pay the "
+                    f"remaining ₹{half:,.0f} "
+                    + (
+                        f"on {deferred_date.isoformat()}, the first date the "
+                        f"forecast shows it's safe to do so."
+                        if deferred_date
+                        else "-- no date within the forecast horizon is safe "
+                        "for the remaining payment."
+                    )
+                ),
+                "_rank_key": (0, 2),
+            }
+        )
+
+    # --- wait_until_safe -------------------------------------------------------
+    safe_idx: Optional[int] = None
+    for idx in range(horizon):
+        if _min_from(idx, amount) >= buffer:
+            safe_idx = idx
+            break
+    if safe_idx is not None:
+        safe_date = today + timedelta(days=safe_idx)
+        strategies.append(
+            {
+                "strategy": "wait_until_safe",
+                "safe": True,
+                "date": safe_date.isoformat(),
+                "amount_paid_now": 0.0,
+                "amount_deferred": round(amount, 2),
+                "min_balance_after": round(_min_from(safe_idx, amount), 2),
+                "note": (
+                    f"Wait until {safe_date.isoformat()} to pay the full "
+                    f"₹{amount:,.0f} for {description} -- the first date the "
+                    f"forecast shows it won't breach your minimum balance."
+                ),
+                "_rank_key": (safe_idx, 1),
+            }
+        )
+    else:
+        strategies.append(
+            {
+                "strategy": "wait_until_safe",
+                "safe": False,
+                "date": None,
+                "amount_paid_now": 0.0,
+                "amount_deferred": round(amount, 2),
+                "min_balance_after": None,
+                "note": (
+                    f"No date within the next {horizon} days is projected to be "
+                    f"safe for the full ₹{amount:,.0f} -- consider a smaller "
+                    f"amount, installments, or raising income/cutting spend first."
+                ),
+                "_rank_key": (horizon + 1, 1),
+            }
+        )
+
+    strategies.sort(key=lambda s: s["_rank_key"])
+    for s in strategies:
+        del s["_rank_key"]
+    return strategies
 
 
 def _do_shift_payment_date(inputs: ForecastInputs, params: dict, health_before: float):
@@ -447,6 +665,17 @@ def simulate(
     # what-if than we are of the baseline it's built on.
     confidence = round(min(forecast_before.confidence, forecast_after.confidence), 3)
 
+    # Upgrade 1: minimum-balance guard -- flag, never block.
+    breaches_minimum_balance, min_balance_date = _minimum_balance_breach(
+        forecast_after, current_forecast_inputs.minimum_balance_to_keep
+    )
+
+    # Upgrade 2: affordability strategies are only produced by the
+    # affordability_check handler, which packs them into `_extra`.
+    affordability_strategies: Optional[list[dict]] = None
+    if action == ActionType.affordability_check and isinstance(_extra, dict):
+        affordability_strategies = _extra.get("strategies")
+
     return SimulationResult(
         request=SimulationRequest(action=action, action_params=action_params),
         health_score_before=round(current_health_score, 2),
@@ -455,6 +684,9 @@ def simulate(
         forecast_after=forecast_after,
         impact=impact,
         confidence=confidence,
+        breaches_minimum_balance=breaches_minimum_balance,
+        min_balance_date=min_balance_date,
+        affordability_strategies=affordability_strategies,
     )
 
 

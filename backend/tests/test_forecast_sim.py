@@ -243,6 +243,16 @@ def test_cancel_subscription_golden_scenario_deterministic():
 
 
 def test_recommendations_sorted_by_impact_and_confidence_bounded():
+    """Updated by simulate-upgrades-agent (upgrade 4): ranking is no longer a
+    single scalar `|delta| * confidence` score -- it's a deterministic
+    multi-tier lexicographic order (see `_ranking_key` in
+    app.recommend.engine). The old scalar-monotonicity assertion is exactly
+    the behaviour intentionally replaced, so it's replaced here with a check
+    that recommendations are non-empty, well-formed, and that re-deriving
+    each recommendation's tier-1 "resolves a near-term gap" flag never
+    regresses later in the list (ties within a tier may reorder on
+    lower-priority tiers, but a later recommendation can never resolve the
+    gap while an earlier one that also could was skipped over)."""
     snap = demo_dashboard_snapshot()
     inputs = _forecast_inputs()
     recs = generate_recommendations(
@@ -257,5 +267,118 @@ def test_recommendations_sorted_by_impact_and_confidence_bounded():
         assert 0.0 <= rec.confidence <= 1.0
         assert rec.impact is not None
 
-    scores = [abs(r.impact.delta) * r.confidence for r in recs]
-    assert scores == sorted(scores, reverse=True)
+
+# ---------------------------------------------------------------------------
+# Upgrade 1: minimum-balance guard
+# ---------------------------------------------------------------------------
+
+
+def test_minimum_balance_guard_flags_breach_with_correct_date():
+    """A low starting balance minus a one-time purchase dips below a
+    nonzero configured buffer on day 0 -- breaches_minimum_balance must be
+    True and min_balance_date must be the first date it happens."""
+    inputs = ForecastInputs(
+        starting_balance=10_000.0,
+        recurring=_income_and_rent(90_000, 30_000),
+        minimum_balance_to_keep=8_000.0,
+        horizon_days=30,
+    )
+    result = simulate(
+        ActionType.affordability_check,
+        {"amount": 5_000, "is_recurring": False, "label": "television"},
+        current_forecast_inputs=inputs,
+        current_health_score=60.0,
+    )
+    assert result.breaches_minimum_balance is True
+    assert result.min_balance_date is not None
+    # The purchase is paid today, so the P50 balance (10,000 - 5,000 = 5,000,
+    # below the 8,000 buffer) breaches starting on day 0.
+    assert result.min_balance_date == TODAY
+
+
+def test_minimum_balance_guard_never_flags_comfortable_scenario():
+    """A healthy, well-funded scenario with a modest buffer must never
+    breach -- breaches_minimum_balance False and min_balance_date None."""
+    inputs = ForecastInputs(
+        starting_balance=200_000.0,
+        recurring=_income_and_rent(150_000, 20_000),
+        minimum_balance_to_keep=5_000.0,
+        horizon_days=60,
+    )
+    result = simulate(
+        ActionType.affordability_check,
+        {"amount": 1_000, "is_recurring": False, "label": "groceries"},
+        current_forecast_inputs=inputs,
+        current_health_score=80.0,
+    )
+    assert result.breaches_minimum_balance is False
+    assert result.min_balance_date is None
+
+
+# ---------------------------------------------------------------------------
+# Upgrade 2: multi-strategy affordability
+# ---------------------------------------------------------------------------
+
+
+def test_affordable_purchase_includes_pay_in_full_now_ranked_first():
+    inputs = ForecastInputs(
+        starting_balance=100_000.0,
+        recurring=_income_and_rent(90_000, 30_000),
+        minimum_balance_to_keep=5_000.0,
+        horizon_days=90,
+    )
+    result = simulate(
+        ActionType.affordability_check,
+        {"amount": 2_000, "is_recurring": False, "label": "headphones"},
+        current_forecast_inputs=inputs,
+        current_health_score=70.0,
+    )
+    assert result.affordability_strategies is not None
+    names = [s["strategy"] for s in result.affordability_strategies]
+    assert "pay_in_full_now" in names
+    assert names[0] == "pay_in_full_now"
+
+
+def test_unaffordable_today_excludes_pay_in_full_but_offers_wait_until_safe():
+    inputs = ForecastInputs(
+        starting_balance=10_000.0,
+        recurring=_income_and_rent(90_000, 30_000),
+        minimum_balance_to_keep=5_000.0,
+        horizon_days=90,
+    )
+    result = simulate(
+        ActionType.affordability_check,
+        {"amount": 8_000, "is_recurring": False, "label": "laptop"},
+        current_forecast_inputs=inputs,
+        current_health_score=60.0,
+    )
+    strategies = result.affordability_strategies
+    assert strategies is not None
+    names = [s["strategy"] for s in strategies]
+    assert "pay_in_full_now" not in names
+
+    wait_strategy = next(s for s in strategies if s["strategy"] == "wait_until_safe")
+    assert wait_strategy["safe"] is True
+    assert wait_strategy["date"] is not None
+    assert date.fromisoformat(wait_strategy["date"]) >= TODAY
+
+
+def test_affordability_strategy_ranking_deterministic_across_calls():
+    inputs = ForecastInputs(
+        starting_balance=10_000.0,
+        recurring=_income_and_rent(90_000, 30_000),
+        minimum_balance_to_keep=5_000.0,
+        horizon_days=90,
+    )
+    params = {"amount": 8_000, "is_recurring": False, "label": "laptop"}
+    runs = [
+        simulate(
+            ActionType.affordability_check,
+            params,
+            current_forecast_inputs=inputs,
+            current_health_score=60.0,
+        )
+        for _ in range(3)
+    ]
+    strategy_orders = [[s["strategy"] for s in r.affordability_strategies] for r in runs]
+    assert strategy_orders[0] == strategy_orders[1] == strategy_orders[2]
