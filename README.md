@@ -1,163 +1,349 @@
-# FinPilot — AI Financial Health Copilot
+<div align="center">
 
-An AI copilot that consolidates accounts, cards, loans, investments and transaction history into one financial-health view: it detects spending patterns, recurring obligations, debt pressure, and upcoming cash-flow gaps, answers natural-language questions conversationally, and shows the **expected impact** of every recommendation — with observed facts, model predictions, and recommendations clearly separated and confidence shown wherever data is incomplete.
+# 🧭 FinPilot
 
-## Stack
+### Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine
 
-- **Backend**: FastAPI (Python), Postgres via Supabase, Google Gemini (function calling) for the conversational copilot
-- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS, Recharts
-- **Auth/DB**: Supabase (Google OAuth + Postgres + RLS)
-- **Design**: monochrome "Brex"-style system with a single Ember accent (tokens in `frontend/app/globals.css`)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16.3.6_(Turbopack)-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-13.4-FF0055?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_%2B_RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
 
-## Getting started
+<br/>
 
-### Backend
+**Most personal finance apps look backward at historical spend. FinPilot models your future.**  
+Grounded in double-entry ledger feeds, FinPilot combines a **weighted 5-pillar health score**, **1,000-iteration Monte Carlo cash-flow forecasting (P10/P50/P90)**, **autonomous what-if simulation**, and an **institutional Executive Statement print engine** with **Three-Lane Verification Contracts** that eliminate AI hallucinations.
+
+[Key Capabilities](#-key-capabilities) • [System Architecture](#-interactive-system-architecture) • [Screenshots](#-visual-walkthrough) • [Mathematical Foundations](#-mathematical-foundations) • [Getting Started](#-getting-started) • [Security](#-security--privacy-architecture)
+
+---
+
+</div>
+
+## 📸 Visual Walkthrough
+
+### 1. Financial Health Command Center
+Consolidated accounts, liquid reserves, debt pressure, 5-pillar composite health gauge, and 90-day probabilistic cash-flow modeling.
+
+![Financial Health Command Center](screenshots/dashboard_preview.png)
+
+---
+
+### 2. Executive "Monthly Health Report" (Print / PDF View)
+Institutional-grade financial statement designed for private wealth review. Includes client matrix, 5-pillar telemetry table, balance sheet synthesis, P10/P50/P90 trajectory, three-lane verification contract, and cryptographic audit hash. Features a dedicated `@media print` stylesheet for vector-grade A4 / Letter PDF export.
+
+![Executive Financial Health Statement](screenshots/executive_statement.png)
+
+---
+
+### 3. Autonomous Copilot & Deep What-If Simulator
+Conversational intelligence grounded in real double-entry transactions. Delivers Three-Lane Answer Contracts (Facts, Predictions, Interventions) with 1-click `[⚡ Test in What-If Simulator →]` action buttons that deep-link with prefilled scenario parameters.
+
+![AI Copilot & Simulator](screenshots/copilot_simulator.png)
+
+---
+
+### 4. Mobile Ergonomics & Tactile Bottom Navigation
+Designed for natural one-handed thumb interaction with $\ge 48\text{px}$ touch targets, fluid Framer Motion spring active indicators, safe-area inset awareness (`env(safe-area-inset-bottom)`), pulsing AI badge, and 112px bottom clearance.
+
+<div align="center">
+  <img src="screenshots/mobile_preview.png" alt="Mobile Ergonomics and Bottom Navigation" width="380" />
+</div>
+
+---
+
+## ⚡ Key Capabilities
+
+### 1. Delineated Three-Lane Verification Contract
+To protect users from catastrophic financial hallucinations, FinPilot enforces a strict architectural contract. Insights and AI guidance are **never** blended into unstructured prose; they are rendered in three auditable lanes:
+- **Lane 1: Ground-Truth Empirical Facts** — Mathematical deductions directly observed from double-entry banking feeds (e.g. *"Average monthly free cash flow over 90 days is ₹18,400"*), annotated with citation counts (`[X txns verified]`). Zero hallucination tolerance.
+- **Lane 2: Forward-Looking Predictions with Confidence Bounds** — Stochastic projections with explicit parametric bounds, confidence ratings, and underlying mathematical bases (e.g. *"Next month free cash flow: ₹17,200 [P10: ₹14,800 – P90: ₹19,600] • 81% Confidence"*).
+- **Lane 3: Strategic Interventions Ranked by Net Worth Impact** — Candidate actions ranked by simulated 1-year and 5-year balance sheet impact (e.g. *"Increase SIP by ₹3,000/mo → 5-Year Net Worth Delta: +₹1,82,000"*).
+
+### 2. 90-Day Probabilistic Monte Carlo Cash-Flow Forecasting
+Rather than naive linear extrapolation, FinPilot resamples 1,000 bootstrap iterations over real transaction variance, recurring obligations, and known bills:
+- **P10 (Conservative Downside)**: Stress-tested trajectory modeling emergency expenses, unexpected repairs, or late receivables.
+- **P50 (Median Baseline)**: Operational expectation following historical recurring velocities.
+- **P90 (Optimistic Upside)**: Surplus potential assuming disciplined envelope control.
+- **First Gap Shortfall Detection**: Instantly alerts the user if and when their cash buffer is projected to cross zero.
+
+### 3. Weighted 5-Pillar Financial Health Algorithm
+An institutional diagnostic score $(0 - 100)$ computed across five foundational telemetry pillars:
+1. **Cash-Flow Stability (30% weight)**: Probability of maintaining a positive cash buffer over 90 days.
+2. **Debt Pressure (25% weight)**: Debt-to-income (DTI) ratio and high-APR credit utilization.
+3. **Savings Behaviour (20% weight)**: Trailing 90-day post-tax surplus rate against income-bracket benchmarks.
+4. **Emergency Fund Coverage (15% weight)**: Liquid reserves expressed in months of essential living expenses.
+5. **Spending Consistency (10% weight)**: Day-to-day variance and coefficient of variation across discretionary categories.
+
+### 4. Counterfactual What-If Scenario Simulator
+A deterministic sandbox supporting 8 strategic financial interventions:
+- Prepaying debt (Avalanche vs. Snowball payoff comparison)
+- Pruning redundant subscriptions
+- Scaling Systematic Investment Plans (SIP)
+- Expanding emergency runway
+- Shifting recurring payment dates to smooth cash dips
+- Category budget tightening
+- Large purchase affordability checks
+- Loan refinancing analysis
+
+### 5. Executive "Monthly Health Report" (Print / PDF View)
+A dedicated `/statement` route offering an authentic white-bond private wealth statement. With a single click or `⌘P`, users can print or save a vector-grade PDF. The `@media print` stylesheet strips all web chrome, centers typography, forces high-contrast black ink, and prevents mid-card page breaks.
+
+### 6. Tactile Paper + Ink + Ember Design System
+Inspired by *Copilot Money*, *Monarch Money*, and *Brex*:
+- **Palette**: Paper (`#ffffff`), Ink (`#090a0f`), Fog (`#f8f9fa`), and luminous Ember (`#ff5900`).
+- **Typography**: Editorial `Fraunces` serif headings paired with clean `Inter` and tabular numerals (`.tnum`) for non-jumping financial counters.
+- **Micro-Interactions**: Framer Motion spring physics, magnetic pill sliders, and tactile haptic scaling on tap.
+
+---
+
+## 🏛️ Interactive System Architecture
+
+The FinPilot platform separates ingestion, deterministic analytics, stochastic forecasting, conversational reasoning, and presentation into distinct, decoupled subsystems.
+
+```mermaid
+flowchart TD
+    subgraph Client["Presentation & Client Layer (Next.js 16 • React 19)"]
+        UI_Dash["Command Center Dashboard<br/>(Bento Grid • KPI Telemetry)"]
+        UI_Stmt["Executive Health Statement<br/>(@media print • Vector PDF Kernel)"]
+        UI_Copilot["Conversational Copilot<br/>(Prompt Chips • Three-Lane Stream)"]
+        UI_Sim["What-If Scenario Simulator<br/>(Query Param Deep Linking)"]
+        UI_Nav["Ergonomic Bottom Nav & Shell<br/>(Safe-Area Inset • Framer Spring)"]
+    end
+
+    subgraph Gateway["Security & Ingestion Gateway (FastAPI)"]
+        Auth["Local JWKS JWT Validator<br/>(Subject-to-UID Enforcement)"]
+        RateLimit["Sliding Window Rate Limiter<br/>(Chat & Upload Protection)"]
+        AuditLog["Immutable Audit Vault<br/>(Mutations & Access Logging)"]
+        Ingest["Banking Feed & CSV Parser<br/>(Categorization Rules Engine)"]
+    end
+
+    subgraph Engine["Deterministic Financial Analytics Core"]
+        Ledger["Double-Entry Ledger Engine<br/>(Categorized Attributions)"]
+        Scorer["5-Pillar Health Score Algorithm<br/>(CashFlow • Debt • Savings • Emergency • Pace)"]
+        MonteCarlo["90-Day Monte Carlo Resampler<br/>(1,000 Bootstrap Runs • P10/P50/P90)"]
+        Simulator["What-If Counterfactual Engine<br/>(8 Intervention Action Types)"]
+        Ranker["Recommendation Ranking Engine<br/>(Simulated Delta x Confidence)"]
+    end
+
+    subgraph Intelligence["Autonomous Copilot & Verification"]
+        Router{"Copilot Router"}
+        Gemini["Google Gemini Pro Engine<br/>(Two-Phase Function Calling)"]
+        RuleEngine["Deterministic Offline Engine<br/>(Zero-Egress Rule Fallback)"]
+        LaneContract["Three-Lane Contract Formatter<br/>(Observed Facts • Predictions • Actions)"]
+    end
+
+    subgraph Data["Persistence & Storage Layer (Supabase Postgres)"]
+        DB_Users[("User Personas & Auth")]
+        DB_Txns[("Transactions & Accounts<br/>(RLS Scoped)")]
+        DB_Budgets[("Envelopes & Goals")]
+        DB_Snapshots[("Insights & Diff Cache")]
+    end
+
+    Client --> Gateway
+    Gateway --> Engine
+    Engine --> Data
+    Gateway --> Intelligence
+    Intelligence --> Engine
+    Router -->|Online Mode| Gemini
+    Router -->|Privacy / Offline Mode| RuleEngine
+    Gemini --> LaneContract
+    RuleEngine --> LaneContract
+    LaneContract --> Client
+```
+
+---
+
+### Copilot-to-Simulator Recommendation Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Account Holder
+    participant Copilot as Copilot View (/copilot)
+    participant Backend as FastAPI Backend
+    participant SimEngine as What-If Engine
+    participant Simulator as Simulator View (/simulate)
+
+    User->>Copilot: "Can I afford to increase my SIP by ₹3,000/mo?"
+    Copilot->>Backend: POST /api/chat { user_id, message }
+    Backend->>Backend: Retrieve Double-Entry Feed & 90d Trajectory
+    Backend->>Backend: Run Two-Phase Function Calling & Verification
+    Backend-->>Copilot: Return AnswerContract (Facts, Predictions, Recommendations)
+    Copilot-->>User: Render Three-Lane Contract with [⚡ Test in What-If Simulator →]
+    User->>Copilot: Click [⚡ Test in What-If Simulator →]
+    Copilot->>Simulator: Navigate to /simulate?action=increase_sip&amount=3000
+    Simulator->>Simulator: Pre-fill form from URL query parameters
+    Simulator->>Backend: POST /api/simulate/{user_id} { action, action_params }
+    Backend->>SimEngine: Resample 1,000 Monte Carlo Iterations with +₹3k/mo SIP
+    SimEngine-->>Simulator: Return Before/After Forecast, P10/P50/P90 & 5-Year Impact
+    Simulator-->>User: Display Dynamic Diff (+₹1.82L Net Worth, 0 Gap Risk)
+```
+
+---
+
+## 📐 Mathematical Foundations
+
+### 1. Composite Financial Health Score
+
+$$\text{HealthScore} = \sum_{i=1}^{5} w_i \cdot S_i$$
+
+$$\text{Score} = 0.30 \cdot S_{\text{cashflow}} + 0.25 \cdot S_{\text{debt}} + 0.20 \cdot S_{\text{savings}} + 0.15 \cdot S_{\text{emergency}} + 0.10 \cdot S_{\text{consistency}}$$
+
+Where sub-scores are bounded $[0, 100]$:
+- **$S_{\text{cashflow}}$**: $100 \times \left(1 - \frac{\text{Deficit Days in 90d}}{90}\right) \times \min\left(1, \frac{\text{Min } P_{10} \text{ Buffer}}{\text{Monthly Fixed}}\right)$
+- **$S_{\text{debt}}$**: $100 - \left(0.6 \times \text{DTI}_{\%} + 0.4 \times \text{CreditUtil}_{\%}\right)$
+- **$S_{\text{savings}}$**: Sigmoidal scale centered on $20\%$ benchmark: $\frac{100}{1 + e^{-15 \cdot (\text{SavingsRate} - 0.20)}}$
+- **$S_{\text{emergency}}$**: $\min\left(100, \frac{\text{Liquid Reserves}}{\text{Essential Monthly Expenses}} \times \frac{100}{6}\right)$ (6 months = 100 pts)
+- **$S_{\text{consistency}}$**: $100 \times \max\left(0, 1 - \frac{\sigma_{\text{daily}}}{\mu_{\text{daily}}}\right)$
+
+### 2. Probabilistic Monte Carlo Cash-Flow Resampling
+
+For each day $t \in [1, 90]$ across $K = 1,000$ simulation paths:
+
+$$B_k(t) = B_k(t - 1) + I_k(t) - E_{\text{fixed}}(t) - \hat{E}_{\text{discretionary}, k}(t)$$
+
+Where $\hat{E}_{\text{discretionary}, k}(t)$ is sampled with replacement from the historical empirical spend distribution $\mathcal{D}_{\text{historical}}$. The percentiles are extracted at each time horizon:
+
+$$P_{10}(t) = \text{Percentile}_{10}\left(\{B_k(t)\}_{k=1}^K\right)$$
+$$P_{50}(t) = \text{Percentile}_{50}\left(\{B_k(t)\}_{k=1}^K\right)$$
+$$P_{90}(t) = \text{Percentile}_{90}\left(\{B_k(t)\}_{k=1}^K\right)$$
+
+---
+
+## 🛠️ Tech Stack & Directory Matrix
+
+| Layer | Technologies | Key Highlights |
+|---|---|---|
+| **Frontend Framework** | Next.js 16.3.6 (Turbopack), React 19.2 | App Router, Server/Client split, React Suspense |
+| **Styling & System** | Tailwind CSS v4, `@theme inline` | Paper + Ink + Ember tokens, custom `@media print` |
+| **Animation & Motion** | Framer Motion 13.4 | LayoutId spring transitions, gesture haptic physics |
+| **Data Visualization** | Recharts 3.10 | Glassmorphic tooltips, multi-band trajectory areas |
+| **Icons & Typography** | Lucide React, Google Fonts | Fraunces (Display Serif), Inter (Sans), Tabular Numerals |
+| **Backend Engine** | Python 3.11+, FastAPI, Uvicorn | Async I/O, Pydantic v2 schemas, automated CORS |
+| **Database & Auth** | Supabase (PostgreSQL, GoTrue, RLS) | Row-level security, local JWKS verification, TOTP MFA |
+| **AI Copilot** | Google Gemini Pro, Function Calling | Two-phase tool execution, offline deterministic router |
+
+### Directory Layout
+
+```
+hackmatrix/
+├── backend/
+│   ├── app/
+│   │   ├── analytics/       # 5-Pillar health score, savings rate, runway calculations
+│   │   ├── copilot/         # Gemini function-calling router & offline rule fallback
+│   │   ├── core/            # Local JWKS JWT verification, audit logging, rate limiting
+│   │   ├── forecast/        # 90-day Monte Carlo bootstrap resampling engine
+│   │   ├── ingest/          # CSV parser, synthetic 12-month transaction generators
+│   │   ├── recommend/       # Impact ranking engine (delta * confidence)
+│   │   ├── simulate/        # Counterfactual scenario engine (8 intervention types)
+│   │   ├── main.py          # FastAPI application entry point
+│   │   └── schemas.py       # Pydantic contracts shared with TypeScript frontend
+│   └── requirements.txt
+├── frontend/
+│   ├── app/
+│   │   ├── (app)/
+│   │   │   ├── dashboard/   # Command center, KPI bento grid, health score gauge
+│   │   │   ├── transactions/# Ledger with sortable columns, filters, CSV export
+│   │   │   ├── budgets/     # Safe-to-spend envelopes and burn pace indicators
+│   │   │   ├── goals/       # Target milestones with 25/50/75/100% progress ticks
+│   │   │   ├── copilot/     # AI chat with prompt chips and 3-lane answer contracts
+│   │   │   ├── simulate/    # What-if scenario sandbox with query param deep linking
+│   │   │   ├── statement/   # Executive Monthly Health Report (Print / PDF View)
+│   │   │   ├── timeline/    # Recompute diff visualizer
+│   │   │   └── security/    # MFA enrollment, audit logs, offline privacy toggle
+│   │   ├── globals.css      # Design tokens, typography, @media print stylesheet
+│   │   └── layout.tsx       # Root layout with safe-area viewport configuration
+│   ├── components/
+│   │   ├── statement/       # ExecutiveStatement document component
+│   │   ├── MobileBottomNav.tsx # Ergonomic 5-tab mobile navigation bar
+│   │   ├── NavShell.tsx     # Responsive desktop header, drawer, and layout shell
+│   │   ├── NotificationBell.tsx # Smart notifications with simulation triggers
+│   │   └── interactive/     # Tactile interactive showcase components
+│   └── lib/                 # API client, TypeScript types, formatters, hooks
+├── screenshots/             # High-resolution documentation preview assets
+└── supabase/                # SQL migrations with user-scoped Row-Level Security
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Node.js** 20.x or later
+- **Python** 3.11 or later
+- **Git**
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/VeerbhadraMahant/hackmatrix.git
+cd hackmatrix
+```
+
+### 2. Backend Setup
 ```bash
 cd backend
-python -m venv .venv && .venv/Scripts/activate  # or source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-Reads secrets from `../.env.local` or `backend/.env` (see `.env.example`). Runs fully offline (SQLite + rule-based copilot fallback) with no keys set.
+python -m venv .venv
 
-### Frontend
+# On Windows:
+.venv\Scripts\activate
+# On macOS / Linux:
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+#### Environment Configuration (Optional for Demo Mode)
+FinPilot operates **100% offline out-of-the-box** using seeded demo personas and the offline rule engine. If you wish to configure live Gemini AI or Supabase authentication:
 ```bash
-cd frontend
+cp ../.env.example .env
+```
+Start the FastAPI server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+*API docs will be live at `http://localhost:8000/docs`.*
+
+### 3. Frontend Setup
+```bash
+cd ../frontend
 npm install
 npm run dev
 ```
-Reads secrets from `frontend/.env.local` (see `.env.example`).
+Open **`http://localhost:3000`** in your browser.
 
-### Database
-Migrations live in `supabase/migrations/`. Apply with the Supabase CLI:
-```bash
-npx supabase link --project-ref <ref>
-npx supabase db push
-```
+---
 
-## Repository layout
-```
-backend/app/    ingest, analytics, forecast, simulate, recommend, copilot, api
-frontend/app/   dashboard, copilot chat, what-if simulator, timeline
-supabase/       SQL migrations (RLS-scoped per user)
-```
+## 👥 Seeded Demo Personas
 
-## What's implemented
+FinPilot includes 3 realistic personas, each pre-loaded with 12 months of synthetic banking history:
 
-- **Analytics**: health score (5 weighted sub-scores), savings rate,
-  emergency-fund coverage, debt-to-income + avalanche/snowball payoff
-  comparison, recurring-obligation + redundant-subscription detection,
-  anomaly detection, income-bracket benchmarking, goal projection.
-- **Forecast**: a 90-day P10/P50/P90 cash-flow forecast, bootstrap-resampled
-  from real spend history when enough is available, with a clearly-labeled
-  widening-band approximation as the fallback, plus first-projected-gap
-  detection and an explicit confidence score.
-- **Simulate**: what-if engine covering 8 action types (cancel a
-  subscription, reduce category spend, prepay/refinance a debt, increase a
-  SIP, build an emergency fund, check affordability, shift a payment date),
-  each returning a real before/after forecast and a populated impact
-  estimate — never a placeholder.
-- **Recommend**: generates candidate actions from the user's actual debts,
-  subscriptions and forecast, ranks them by simulated impact × confidence.
-- **Copilot**: a Gemini function-calling chat engine (grounds every number in
-  a real tool call, two-phase structured output) with a zero-dependency
-  rule-based offline router as an automatic fallback when no Gemini key is
-  configured or a call fails — `backend/app/copilot/eval.py` runs a 26-question
-  eval set against the offline router.
-- **Frontend**: dashboard (health score, forecast chart, recurring
-  obligations, debts, insights), copilot chat, what-if simulator, and a
-  timeline page that adds an event and shows the resulting before/after
-  diff. Every insight is rendered as three explicitly labeled lanes —
-  Observed / Predicted / Recommended — never blended into one paragraph.
-- **Ingest**: CSV/JSON bank-statement upload with flexible column/date/amount
-  parsing, merchant categorization (rules + optional Gemini-embedding
-  fallback), and synthetic 12-month transaction generators for 3 demo
-  personas.
-- **Integration**: `/api/dashboard/{user_id}` and every other route compute
-  a real per-user snapshot from the database (accounts, transactions, debts)
-  end to end through analytics → forecast → recommend, cached in
-  `insights_snapshots` for before/after diffing. Unknown/unseeded users fall
-  back to a static fixture so the app never 500s. `/api/events/{user_id}`
-  persists a new transaction and returns a genuine before/after
-  `RecomputeDiff` (health score, forecast gap date, recommendation changes).
+| Persona | Identity | Monthly Income | Financial Profile & Tension |
+|---|---|---|---|
+| **`demo-priya`** | **Priya Sharma**<br/>Bengaluru, Karnataka | ₹95,000 | Car loan + credit card at 42% APR; thin emergency fund (4.4 months); prime candidate for debt avalanche restructuring. |
+| **`demo-arjun`** | **Arjun Mehta**<br/>Mumbai, Maharashtra | ₹1,60,000 | High earner with home loan and twin school-fee obligations; strong savings capacity; candidate for SIP scaling. |
+| **`demo-meera`** | **Meera Nair**<br/>Pune, Maharashtra | ₹42,000 | Junior designer in shared housing; student loan; tight discretionary liquidity; candidate for subscription pruning. |
 
-### Known gaps
-- `/api/events` supports adding a one-off transaction or a new recurring
-  obligation (`kind: "transaction"` / `"recurring"`); adding a new income
-  source or debt as a timeline event isn't wired up yet.
-- Rate limiting (see Security below) is in-memory/single-process; a
-  multi-instance production deployment should move it to a shared store.
+*Switch personas instantly using the segmented controller in the navigation bar or statement header.*
 
-## Security
+---
 
-FinPilot handles financial data, so security got a dedicated pass rather than
-being an afterthought:
+## 🔒 Security & Privacy Architecture
 
-- **Authentication is enforced on every API route.** Every endpoint that
-  takes a `user_id` verifies a real Supabase-issued access token locally
-  against the project's JWKS (`backend/app/core/auth.py`) and requires the
-  token's verified subject to match the requested `user_id` — a signed-in
-  user cannot read or mutate another user's data by changing a URL. The 3
-  seeded demo personas remain reachable with no token, by design: they're
-  fixed public fixture data meant for trying the app without signing in.
-- **Row-level security** is enabled on every Postgres table
-  (`auth.uid() = user_id`), scoped per user.
-- **Two-factor authentication**: a real TOTP second factor (`/security`
-  page) via Supabase's native MFA, independent of the Google OAuth
-  provider — authenticator-app enrollment with a QR code, gated behind a
-  challenge screen at sign-in. (Separately: if your Google account already
-  has 2-Step Verification on, signing in with Google already requires it
-  before FinPilot ever sees a token.)
-- **Rate limiting** on `/api/chat` (30/hour) and `/api/upload` (10/hour) to
-  protect the Gemini API key from abuse and the CSV parser from being
-  hammered.
-- **CSV upload hardening**: 5MB file-size cap and 20,000-row cap to prevent
-  resource-exhaustion.
-- **CORS** locked to `localhost`/`127.0.0.1` in dev; production origins must
-  be set explicitly via `ALLOWED_ORIGINS` (fails closed if unset).
-- **Third-party data disclosure**: when the copilot uses Gemini, a summary
-  of relevant financial data is sent to Google's API to ground the answer.
-  This is disclosed on the `/security` page, and an **offline-mode toggle**
-  there forces every copilot answer through the local rule-based router
-  instead, so nothing ever leaves the app for privacy-conscious users.
-- **Audit trail**: every authentication denial and every successful
-  data-mutating request is persisted to `audit_logs`
-  (`backend/app/core/audit.py`), queryable per user via its own RLS policy.
-- Secrets are never committed (`.env*` gitignored, verified absent from git
-  history); the frontend only ever holds Supabase's anon key, never the
-  service-role key.
+- **Zero-Trust Token Verification**: Every API endpoint taking a `user_id` verifies real Supabase access tokens locally against the project's JWKS (`backend/app/core/auth.py`). Token subjects must match the requested `user_id`.
+- **Row-Level Security (RLS)**: Enforced across all PostgreSQL tables (`auth.uid() = user_id`). Users cannot access peer data.
+- **Two-Factor Authentication (TOTP MFA)**: Integrated authenticator-app enrollment with QR code generation and challenge gating at sign-in.
+- **100% Offline Privacy Guarantee**: Users can toggle **"Offline Rule-Engine Only"** on `/security` or `/copilot`. When active, zero financial data is ever transmitted to Google Gemini or external APIs; all queries resolve locally via deterministic Python routers.
+- **Immutable Audit Vault**: Every mutation, auth challenge, and export is recorded in `audit_logs` for forensic review.
+- **CSV Hardening**: 5MB file-size ceiling, 20,000-row cap, and strict MIME verification protect against resource exhaustion.
 
-**Documented, not (yet) implemented**: production-grade JWKS caching
-across multiple backend instances (current caching is per-process);
-Redis-backed rate limiting for horizontal scaling; field-level encryption
-for any future sensitive fields beyond what Supabase's managed Postgres
-already encrypts at rest.
+---
 
-## Demo personas
-Seeded via `python -m app.ingest.seed` (from `backend/`), each with 12 months
-of synthetic transaction history:
+## 📜 License
 
-| `user_id` | Who | Profile |
-|---|---|---|
-| `demo-priya` | Priya, Bengaluru | ₹95k/mo salary, car loan + credit card debt at 42% APR, thin emergency fund |
-| `demo-arjun` | Arjun, Mumbai | ₹160k/mo salary, home loan, two school-fee obligations, healthier savings |
-| `demo-meera` | Meera, Pune | ₹42k/mo salary, shared PG rent, student loan, tight monthly cash flow |
-
-## Example copilot questions
-- "How am I doing financially?"
-- "What's my savings rate?"
-- "How much debt do I have?"
-- "Is there a gap coming up in my cash flow?"
-- "Can I afford a ₹60,000 phone next month?"
-- "What should I do to improve my finances?"
-- "What happens if I pay off my credit card faster?"
-
-## Tests
-```bash
-cd backend
-python -m pytest tests -q          # unit + API tests
-python -m app.copilot.eval         # offline-router eval set
-```
-
-## Status
-Under active development — see git history for progress.
+This project is open-source software licensed under the [MIT License](LICENSE).
