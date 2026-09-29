@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, setUserId } from "@/lib/user";
 
@@ -35,7 +36,7 @@ function PersonaSwitcher() {
     <div
       role="radiogroup"
       aria-label="Demo persona"
-      className="flex items-center gap-1 rounded-full border border-black/[0.08] bg-white/70 p-1 backdrop-blur-md shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+      className="flex items-center gap-1 rounded-full border border-mist bg-paper/70 p-1 backdrop-blur-md shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
     >
       {DEMO_PERSONAS.map((persona) => {
         const active = userId === persona.id;
@@ -55,7 +56,7 @@ function PersonaSwitcher() {
             {active && (
               <motion.div
                 layoutId="active-persona-pill"
-                className="absolute inset-0 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.04]"
+                className="absolute inset-0 rounded-full bg-paper shadow-[0_1px_4px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] border border-mist"
                 transition={{ type: "spring", stiffness: 450, damping: 35 }}
               />
             )}
@@ -91,7 +92,7 @@ export function NavShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-3 sm:px-8">
           {/* Logo & Brand */}
           <Link href="/dashboard" className="flex items-center gap-2 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-white font-display font-medium text-base shadow-[0_2px_8px_rgba(0,0,0,0.2)] group-hover:scale-105 transition-transform">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-paper font-display font-medium text-base shadow-[0_2px_8px_rgba(0,0,0,0.2)] group-hover:scale-105 transition-transform">
               F
             </div>
             <div className="flex items-center gap-1.5">
@@ -103,7 +104,7 @@ export function NavShell({ children }: { children: ReactNode }) {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 rounded-full border border-black/[0.06] bg-fog/70 p-1 backdrop-blur-md">
+          <nav className="hidden md:flex items-center gap-1 rounded-full border border-mist bg-fog/70 p-1 backdrop-blur-md">
             {LINKS.map((link) => {
               const active = pathname?.startsWith(link.href);
               return (
@@ -118,7 +119,7 @@ export function NavShell({ children }: { children: ReactNode }) {
                   {active && (
                     <motion.div
                       layoutId="active-nav-pill"
-                      className="absolute inset-0 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] border border-black/[0.04]"
+                      className="absolute inset-0 rounded-full bg-paper shadow-[0_1px_3px_rgba(0,0,0,0.06)] border border-mist"
                       transition={{ type: "spring", stiffness: 450, damping: 35 }}
                     />
                   )}
@@ -127,12 +128,13 @@ export function NavShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
-          {/* Right actions: Persona Switcher + Notification Bell + Sign In + Mobile Toggle */}
+          {/* Right actions: Persona Switcher + Notification Bell + Theme Toggle + Sign In + Mobile Toggle */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="hidden sm:block">
               <PersonaSwitcher />
             </div>
             <NotificationBell userId={userId} />
+            <ThemeToggle />
             <div className="hidden lg:block">
               <SignInButton />
             </div>
@@ -141,7 +143,7 @@ export function NavShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex md:hidden h-9 w-9 items-center justify-center rounded-chip border border-black/[0.08] bg-white text-ink hover:bg-fog"
+              className="flex md:hidden h-9 w-9 items-center justify-center rounded-chip border border-mist bg-paper text-ink hover:bg-fog transition-colors"
               aria-label="Toggle navigation menu"
             >
               <svg
@@ -168,10 +170,10 @@ export function NavShell({ children }: { children: ReactNode }) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="md:hidden border-t border-black/[0.06] bg-white/95 backdrop-blur-xl px-4 py-4 overflow-hidden"
+              className="md:hidden border-t border-mist bg-paper/95 backdrop-blur-xl px-4 py-4 overflow-hidden"
             >
               <div className="flex flex-col gap-2">
-                <div className="mb-2 pb-2 border-b border-black/[0.06] sm:hidden">
+                <div className="mb-2 pb-2 border-b border-mist sm:hidden">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-pewter block mb-1.5">
                     Demo Persona
                   </span>
@@ -186,9 +188,9 @@ export function NavShell({ children }: { children: ReactNode }) {
                         href={link.href}
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
-                          "px-3 py-2 text-sm rounded-chip font-medium text-center",
+                          "px-3 py-2 text-sm rounded-chip font-medium text-center transition-colors",
                           active
-                            ? "bg-ink text-white font-semibold"
+                            ? "bg-ink text-paper font-semibold"
                             : "bg-fog text-graphite hover:text-ink"
                         )}
                       >
@@ -197,7 +199,11 @@ export function NavShell({ children }: { children: ReactNode }) {
                     );
                   })}
                 </div>
-                <div className="mt-3 pt-3 border-t border-black/[0.06]">
+                <div className="mt-3 pt-3 border-t border-mist flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-graphite">Theme</span>
+                    <ThemeToggle />
+                  </div>
                   <SignInButton />
                 </div>
               </div>

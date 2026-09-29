@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import type { ActionType, RecurringObligation, SimulationResult } from "@/lib/types";
@@ -22,12 +24,55 @@ const SCENARIOS: { kind: ScenarioKind; label: string; action: ActionType; icon: 
   { kind: "increase_sip", label: "Increase Monthly SIP", action: "increase_sip", icon: "📈" },
 ];
 
-export default function SimulatePage() {
+function SimulateContent() {
   const userId = useUserId();
-  const [scenario, setScenario] = useState<ScenarioKind>("cancel_subscription");
-  const [groupId, setGroupId] = useState<string | null>(null);
-  const [debtId, setDebtId] = useState<string | null>(null);
-  const [extraAmount, setExtraAmount] = useState(2000);
+  const searchParams = useSearchParams();
+
+  const actionParam = searchParams.get("action");
+  const groupIdParam = searchParams.get("groupId");
+  const debtIdParam = searchParams.get("debtId");
+  const amountParam = searchParams.get("amount");
+
+  const validScenarios: ScenarioKind[] = ["cancel_subscription", "prepay_debt", "increase_sip"];
+  const isDeepLinked = Boolean(actionParam && validScenarios.includes(actionParam as ScenarioKind));
+
+  const [scenario, setScenario] = useState<ScenarioKind>(() => {
+    if (actionParam && validScenarios.includes(actionParam as ScenarioKind)) {
+      return actionParam as ScenarioKind;
+    }
+    return "cancel_subscription";
+  });
+
+  const [groupId, setGroupId] = useState<string | null>(groupIdParam || null);
+  const [debtId, setDebtId] = useState<string | null>(debtIdParam || null);
+
+  const [extraAmount, setExtraAmount] = useState<number>(() => {
+    if (amountParam) {
+      const parsed = parseInt(amountParam, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return actionParam === "increase_sip" ? 3000 : 2000;
+  });
+
+  const [prefilledFromCopilot, setPrefilledFromCopilot] = useState<boolean>(isDeepLinked);
+
+  // Sync state if searchParams change dynamically
+  useEffect(() => {
+    const action = searchParams.get("action") as ScenarioKind | null;
+    if (action && validScenarios.includes(action)) {
+      setScenario(action);
+      const gId = searchParams.get("groupId");
+      if (gId) setGroupId(gId);
+      const dId = searchParams.get("debtId");
+      if (dId) setDebtId(dId);
+      const amt = searchParams.get("amount");
+      if (amt) {
+        const parsed = parseInt(amt, 10);
+        if (!isNaN(parsed) && parsed > 0) setExtraAmount(parsed);
+      }
+      setPrefilledFromCopilot(true);
+    }
+  }, [searchParams]);
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
   const { data: dashboard, loading: dashboardLoading } = useAsync(fetchDashboard, [userId]);
@@ -57,6 +102,7 @@ export default function SimulatePage() {
     setDebtId(null);
     setResult(null);
     setError(null);
+    setPrefilledFromCopilot(false);
   }
 
   async function run() {
@@ -84,6 +130,41 @@ export default function SimulatePage() {
           Simulate prospective financial adjustments. See genuine before vs. after cash-flow forecast diffs.
         </p>
       </div>
+
+      {/* Deep Link Pre-fill Notification Badge */}
+      {prefilledFromCopilot && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between gap-3 px-4 py-3 rounded-chip bg-ember/[0.08] border border-ember/25 text-ink shadow-sm"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ember text-white text-[11px] font-bold shrink-0">
+              ⚡
+            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+              <span className="text-xs font-bold text-ember-700">
+                Pre-filled from Copilot Recommendation
+              </span>
+              <span className="text-[11px] text-graphite hidden sm:inline">
+                &middot; Initialized for scenario:{" "}
+                <strong className="text-ink font-semibold">
+                  {SCENARIOS.find((s) => s.kind === scenario)?.label}
+                </strong>
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPrefilledFromCopilot(false)}
+            className="text-xs text-pewter hover:text-ink transition-colors px-1 cursor-pointer shrink-0"
+            title="Dismiss badge"
+            aria-label="Dismiss Copilot pre-fill badge"
+          >
+            ✕
+          </button>
+        </motion.div>
+      )}
 
       {/* Scenario Selector Pills */}
       <div className="flex flex-wrap gap-2.5">
@@ -150,6 +231,11 @@ export default function SimulatePage() {
                       {formatCurrency(d.principal)} balance &middot; {d.interest_rate_apr.toFixed(1)}% APR
                     </option>
                   ))}
+                  {activeDebtId && !(dashboard?.debts ?? []).some((d) => d.id === activeDebtId) && (
+                    <option value={activeDebtId}>
+                      Target Debt ID: {activeDebtId} (from Copilot)
+                    </option>
+                  )}
                 </select>
                 <AmountSlider
                   label="Extra Monthly Prepayment"
@@ -285,9 +371,12 @@ function SubscriptionPicker({
   selected: string | null;
   onSelect: (id: string) => void;
 }) {
-  const subs = obligations.filter((o) => o.category === "subscriptions");
+  const subs = obligations.filter(
+    (o) => o.category === "subscriptions" || o.group_id === selected
+  );
+  const listToRender = subs.length > 0 ? subs : obligations;
 
-  if (subs.length === 0) {
+  if (listToRender.length === 0 && !selected) {
     return (
       <EmptyState
         title="No recurring obligations found"
@@ -296,13 +385,15 @@ function SubscriptionPicker({
     );
   }
 
+  const hasSelectedInList = listToRender.some((o) => o.group_id === selected);
+
   return (
     <div className="flex flex-col gap-2.5">
       <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
         Select Subscription to Cancel
       </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {subs.map((o) => {
+        {listToRender.map((o) => {
           const isSelected = selected === o.group_id;
           return (
             <button
@@ -327,6 +418,20 @@ function SubscriptionPicker({
             </button>
           );
         })}
+
+        {selected && !hasSelectedInList && (
+          <button
+            type="button"
+            onClick={() => onSelect(selected)}
+            className="flex min-h-11 items-center justify-between p-3.5 rounded-chip border border-ember bg-orange-50/30 ring-1 ring-ember text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-ember" />
+              <span className="text-sm font-semibold text-ink">Target Subscription</span>
+            </div>
+            <span className="text-[10px] font-bold text-ember uppercase">Selected ({selected})</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -336,13 +441,15 @@ function AmountSlider({
   label,
   value,
   onChange,
-  max,
+  max = 20000,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
-  max: number;
+  max?: number;
 }) {
+  const effectiveMax = Math.max(max, value);
+
   return (
     <div className="flex flex-col gap-3 p-4 rounded-surface border border-black/[0.06] bg-fog/50">
       <div className="flex items-center justify-between">
@@ -355,7 +462,7 @@ function AmountSlider({
       <input
         type="range"
         min={0}
-        max={max}
+        max={effectiveMax}
         step={500}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
@@ -363,9 +470,40 @@ function AmountSlider({
       />
       <div className="flex justify-between text-[10px] text-pewter font-medium">
         <span>₹0</span>
-        <span>{formatCurrency(max / 2)}</span>
-        <span>{formatCurrency(max)}</span>
+        <span>{formatCurrency(Math.round(effectiveMax / 2))}</span>
+        <span>{formatCurrency(effectiveMax)}</span>
       </div>
     </div>
+  );
+}
+
+function SimulateSkeleton() {
+  return (
+    <div className="flex flex-col gap-8 pb-16 max-w-5xl mx-auto">
+      <div className="border-b border-black/[0.04] pb-4">
+        <Skeleton className="h-8 w-72 mb-2" />
+        <Skeleton className="h-4 w-96" />
+      </div>
+      <div className="flex flex-wrap gap-2.5">
+        <Skeleton className="h-10 w-44 rounded-full" />
+        <Skeleton className="h-10 w-44 rounded-full" />
+        <Skeleton className="h-10 w-44 rounded-full" />
+      </div>
+      <Card className="p-6 sm:p-8">
+        <Skeleton className="h-6 w-48 mb-4" />
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default function SimulatePage() {
+  return (
+    <Suspense fallback={<SimulateSkeleton />}>
+      <SimulateContent />
+    </Suspense>
   );
 }
