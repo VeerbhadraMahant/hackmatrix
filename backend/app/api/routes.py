@@ -8,13 +8,15 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile
 from sqlmodel import Session, select
 
 from app.analytics.recurring import normalize_merchant
 from app.copilot.engine import answer as copilot_answer
+from app.core.auth import DEMO_USER_IDS, resolve_user_id, verify_supabase_token
 from app.core.config import get_settings
 from app.core.db import engine
+from app.core.ratelimit import chat_limiter, upload_limiter
 from app.forecast.alerts import maybe_send_gap_alert
 from app.ingest.categorize import categorize
 from app.ingest.snapshot import build_dashboard_snapshot, get_last_snapshot
@@ -33,6 +35,11 @@ from app.simulate.engine import ForecastInputs, simulate
 router = APIRouter()
 
 _LIQUID_ACCOUNT_TYPES = {"checking", "savings"}
+
+# CSV upload hardening: cap both raw size and parsed row count so a huge or
+# malformed file can't exhaust memory/DB time (resource-exhaustion DoS).
+_MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5MB
+_MAX_UPLOAD_ROWS = 20_000
 
 # Typical interval (days) per frequency -- mirrors the buckets
 # app/analytics/recurring.py's detect_recurring() classifies into, so
@@ -79,20 +86,40 @@ def health_check() -> dict:
 
 
 @router.get("/dashboard/{user_id}", response_model=DashboardSnapshot)
-def get_dashboard(user_id: str) -> DashboardSnapshot:
+def get_dashboard(user_id: str = Depends(resolve_user_id)) -> DashboardSnapshot:
     with Session(engine) as session:
         return build_dashboard_snapshot(user_id, session)
 
 
+def _resolve_body_user_id(req: ChatRequest, authorization: str | None = Header(default=None)) -> str:
+    """Same trust rule as `resolve_user_id`, but for endpoints (like /chat)
+    where user_id arrives in the JSON body rather than the URL path."""
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(401, "Authorization header must be 'Bearer <token>'")
+        claims = verify_supabase_token(token)
+        verified_user_id = claims.get("sub")
+        if req.user_id in DEMO_USER_IDS:
+            return req.user_id
+        if verified_user_id != req.user_id:
+            raise HTTPException(403, "Token does not authorize access to this user_id")
+        return verified_user_id
+    if req.user_id in DEMO_USER_IDS:
+        return req.user_id
+    raise HTTPException(401, "Authentication required for non-demo users")
+
+
 @router.post("/chat", response_model=AnswerContract)
-def chat(req: ChatRequest) -> AnswerContract:
+def chat(req: ChatRequest, user_id: str = Depends(_resolve_body_user_id)) -> AnswerContract:
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
-    return copilot_answer(req.user_id, req.message)
+    chat_limiter.check(user_id)
+    return copilot_answer(user_id, req.message)
 
 
 @router.post("/simulate/{user_id}", response_model=SimulationResult)
-def run_simulation(user_id: str, req: SimulationRequest) -> SimulationResult:
+def run_simulation(req: SimulationRequest, user_id: str = Depends(resolve_user_id)) -> SimulationResult:
     with Session(engine) as session:
         snap = build_dashboard_snapshot(user_id, session)
         inputs = _forecast_inputs_from_snapshot(snap, user_id, session)
@@ -108,7 +135,7 @@ def run_simulation(user_id: str, req: SimulationRequest) -> SimulationResult:
 
 
 @router.post("/upload/{user_id}", response_model=RecomputeDiff)
-async def upload_transactions(user_id: str, file: UploadFile) -> RecomputeDiff:
+async def upload_transactions(file: UploadFile, user_id: str = Depends(resolve_user_id)) -> RecomputeDiff:
     """Accepts a multipart bank-statement CSV, parses + categorizes it, and
     persists the resulting transactions for `user_id`. account_id defaults to
     a synthetic per-user "uploaded" account since bank CSV exports rarely
@@ -118,15 +145,20 @@ async def upload_transactions(user_id: str, file: UploadFile) -> RecomputeDiff:
     was last cached for this user (or a freshly computed one if none was
     cached yet), "after" is recomputed post-ingest.
     """
+    upload_limiter.check(user_id)
     raw = await file.read()
     if not raw:
         raise HTTPException(400, "uploaded file is empty")
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File too large (max {_MAX_UPLOAD_BYTES // 1024 // 1024}MB)")
 
     account_id = f"acc-uploaded-{user_id}"
     try:
         rows = parse_transaction_csv(raw, user_id=user_id, account_id=account_id)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    if len(rows) > _MAX_UPLOAD_ROWS:
+        raise HTTPException(413, f"Too many transactions in one upload (max {_MAX_UPLOAD_ROWS})")
 
     with Session(engine) as session:
         before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)
@@ -185,7 +217,7 @@ def _build_recompute_diff(*, trigger: str, before: DashboardSnapshot, after: Das
 
 
 @router.post("/events/{user_id}", response_model=RecomputeDiff)
-def add_event(user_id: str, payload: dict) -> RecomputeDiff:
+def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> RecomputeDiff:
     """Persist a new event (transaction, income, or debt) for `user_id`, then
     recompute the dashboard snapshot before vs. after so the UI can show
     exactly how recommendations/health score/forecast changed.
@@ -304,7 +336,7 @@ def add_event(user_id: str, payload: dict) -> RecomputeDiff:
 
 
 @router.post("/alerts/gap/{user_id}")
-def send_gap_alert(user_id: str, payload: dict) -> dict:
+def send_gap_alert(payload: dict, user_id: str = Depends(resolve_user_id)) -> dict:
     """Explicit, user-triggered cash-flow gap alert email. Not called
     automatically by any other route -- must be invoked by a frontend
     button so we never spam users on every dashboard load."""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -17,11 +18,17 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan)
 
+# SECURITY: in dev, allow any localhost/127.0.0.1 port (next dev picks a
+# different one whenever 3000 is busy). In production, ALLOWED_ORIGINS must
+# be set explicitly to the real deployed frontend origin(s) -- comma
+# separated -- so the API can't be called cross-origin from an arbitrary
+# site with a signed-in user's cookies/token. Unset in prod = no prod
+# origins trusted (fails closed, not open).
+_prod_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    # Hardcoding just :3000 broke local dev the moment that port was busy and
-    # `next dev` picked 3001+ instead -- allow any localhost/127.0.0.1 port so
-    # the frontend can bind wherever it lands without a backend restart.
+    allow_origins=_prod_origins,
     allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$",
     allow_credentials=True,
     allow_methods=["*"],
