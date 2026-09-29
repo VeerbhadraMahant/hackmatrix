@@ -10,6 +10,8 @@ import { HealthScoreCard } from "@/components/dashboard/HealthScoreCard";
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { RecurringList } from "@/components/dashboard/RecurringList";
 import { DebtsList } from "@/components/dashboard/DebtsList";
+import { AccountCards } from "@/components/dashboard/AccountCards";
+import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { AnswerContractView } from "@/components/AnswerContractView";
 import { formatCurrency, formatPercent } from "@/lib/format";
 
@@ -63,6 +65,15 @@ export default function DashboardPage() {
         </CardHeader>
         <ForecastChart forecast={data.forecast} />
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Net worth over time</CardTitle>
+        </CardHeader>
+        <NetWorthTrend userId={userId} />
+      </Card>
+
+      <AccountCards userId={userId} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RecurringList obligations={data.recurring_obligations} />

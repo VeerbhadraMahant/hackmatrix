@@ -5,11 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, setUserId } from "@/lib/user";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/transactions", label: "Transactions" },
+  { href: "/budgets", label: "Budgets" },
+  { href: "/goals", label: "Goals" },
   { href: "/copilot", label: "Copilot" },
   { href: "/simulate", label: "Simulate" },
   { href: "/timeline", label: "Timeline" },
@@ -53,6 +57,7 @@ function PersonaSwitcher() {
 
 export function NavShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const userId = useUserId();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -79,6 +84,7 @@ export function NavShell({ children }: { children: ReactNode }) {
             })}
           </nav>
           <PersonaSwitcher />
+          <NotificationBell userId={userId} />
           <SignInButton />
         </div>
       </header>
