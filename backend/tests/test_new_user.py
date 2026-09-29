@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api import routes
 from app.core.auth import resolve_user_id
 from app.core.db import engine, init_db
 from app.main import app

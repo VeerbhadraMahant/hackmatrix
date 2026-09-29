@@ -37,7 +37,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 /** Lets a signed-in user build up their own data: accounts, single
  * transactions/income, or a bank-statement CSV. `onAdded` fires after each
  * successful write so the parent can refetch the dashboard. */
-export function AddDataPanel({ userId, onAdded }: { userId: string; onAdded: () => void }) {
+export function AddDataPanel({ userId, onAdded }: { userId: string; onAdded?: () => void }) {
   const [tab, setTab] = useState<Tab>("account");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export function AddDataPanel({ userId, onAdded }: { userId: string; onAdded: () 
     try {
       setNotice(await fn());
       reset();
-      onAdded();
+      onAdded?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

@@ -1,9 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import type { ActionType, RecurringObligation, SimulationResult } from "@/lib/types";
@@ -56,8 +55,13 @@ function SimulateContent() {
 
   const [prefilledFromCopilot, setPrefilledFromCopilot] = useState<boolean>(isDeepLinked);
 
-  // Sync state if searchParams change dynamically
-  useEffect(() => {
+  // Sync state if searchParams change dynamically. Done during render (the
+  // React-documented "adjust state on prop change" pattern) rather than in an
+  // effect, so there's no extra render pass with stale values.
+  const paramsKey = searchParams.toString();
+  const [syncedParamsKey, setSyncedParamsKey] = useState(paramsKey);
+  if (syncedParamsKey !== paramsKey) {
+    setSyncedParamsKey(paramsKey);
     const action = searchParams.get("action") as ScenarioKind | null;
     if (action && validScenarios.includes(action)) {
       setScenario(action);
@@ -72,7 +76,7 @@ function SimulateContent() {
       }
       setPrefilledFromCopilot(true);
     }
-  }, [searchParams]);
+  }
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
   const { data: dashboard, loading: dashboardLoading } = useAsync(fetchDashboard, [userId]);

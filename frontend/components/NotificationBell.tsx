@@ -3,15 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Bell,
-  CheckCheck,
-  ArrowRight,
-  Sparkles,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-} from "lucide-react";
+import { Bell, CheckCheck, CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import type { NotificationItem, NotificationSeverity } from "@/lib/types";

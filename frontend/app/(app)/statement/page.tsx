@@ -10,7 +10,7 @@ import { ExecutiveStatement } from "@/components/statement/ExecutiveStatement";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { HealthScoreSkeleton, ListItemSkeleton } from "@/components/ui/Skeleton";
-import { Printer, ArrowLeft, FileText, CheckCircle2, Shield } from "lucide-react";
+import { Printer, ArrowLeft, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function StatementPage() {

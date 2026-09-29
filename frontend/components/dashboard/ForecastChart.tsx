@@ -36,7 +36,6 @@ interface CustomTooltipProps {
 function CustomForecastTooltip({
   active,
   payload,
-  label,
   compareLabel = "Baseline",
 }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;

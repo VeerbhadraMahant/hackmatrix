@@ -29,7 +29,6 @@ import {
   ShoppingCart,
   Sparkles,
   Trash2,
-  TrendingDown,
   TrendingUp,
   Utensils,
   Zap,
@@ -128,12 +127,34 @@ export default function BudgetsPage() {
     }
     setCreating(true);
     setCreateError(null);
+    // Optimistic: the envelope appears (and the form clears) immediately; the
+    // post-write data-changed refetch swaps in the server's real numbers.
+    const category = newCategory;
+    budgets.mutate((prev) => [
+      ...(prev ?? []).filter((b) => b.category !== category),
+      { id: `tmp-${Date.now()}`, user_id: userId, category, monthly_limit: limit },
+    ]);
+    status.mutate((prev) => {
+      const list = prev ?? [];
+      const existing = list.find((s) => s.category === category);
+      const spent = existing?.spent_so_far ?? 0;
+      const next: BudgetStatus = {
+        category,
+        monthly_limit: limit,
+        spent_so_far: spent,
+        remaining: limit - spent,
+        percent_used: limit > 0 ? (spent / limit) * 100 : 0,
+        status: existing?.status ?? "under",
+      };
+      return existing ? list.map((s) => (s.category === category ? next : s)) : [...list, next];
+    });
+    setNewLimit("");
     try {
-      await api.createBudget(userId, { category: newCategory, monthly_limit: limit });
-      setNewLimit("");
+      await api.createBudget(userId, { category, monthly_limit: limit });
+    } catch (err) {
       budgets.reload();
       status.reload();
-    } catch (err) {
+      setNewLimit(String(limit));
       setCreateError(err instanceof Error ? err.message : "Could not create budget envelope");
     } finally {
       setCreating(false);
@@ -141,9 +162,15 @@ export default function BudgetsPage() {
   }
 
   async function handleDelete(budgetId: string) {
-    await api.deleteBudget(userId, budgetId);
-    budgets.reload();
-    status.reload();
+    const category = (budgets.data ?? []).find((b) => b.id === budgetId)?.category;
+    budgets.mutate((prev) => (prev ?? []).filter((b) => b.id !== budgetId));
+    if (category) status.mutate((prev) => (prev ?? []).filter((s) => s.category !== category));
+    try {
+      await api.deleteBudget(userId, budgetId);
+    } catch {
+      budgets.reload();
+      status.reload();
+    }
   }
 
   const budgetStatuses = status.data ?? [];

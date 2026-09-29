@@ -22,13 +22,16 @@ import type {
   UpdateGoalRequest,
 } from "./types";
 import { createClient } from "./supabase/client";
+import { DATA_CHANGED_EVENT } from "./hooks";
 import { getOfflineOnly } from "./user";
 
 // Production (Vercel multi-service project) serves the backend on the same
 // origin under /api, so default to relative URLs there; local dev talks to
 // the separate uvicorn server. NEXT_PUBLIC_API_URL overrides either.
+// Dev uses 127.0.0.1, not "localhost": uvicorn binds IPv4 only, and clients
+// that try IPv6 (::1) first wait ~2s per request before falling back.
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:8000");
 
 const AUTH_HEADER_TIMEOUT_MS = 2000;
 
@@ -62,6 +65,13 @@ async function authHeader(): Promise<Record<string, string>> {
   }
 }
 
+/** After a successful write, tell every mounted useAsync() to refetch. */
+function notifyIfWrite(method?: string) {
+  if (method && method !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = await authHeader();
   const res = await fetch(`${API_URL}${path}`, {
@@ -71,6 +81,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status} ${await res.text()}`);
   }
+  notifyIfWrite(init?.method);
   // DELETE endpoints (e.g. budgets/goals) return 204 with no body -- res.json()
   // would throw on the empty string, so short-circuit for callers typed <void>.
   if (res.status === 204) return undefined as T;
@@ -143,6 +154,7 @@ export const api = {
       body,
     });
     if (!res.ok) throw new Error(`API upload failed: ${res.status} ${await res.text()}`);
+    notifyIfWrite("POST");
     return res.json() as Promise<RecomputeDiff>;
   },
 

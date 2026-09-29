@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { AnswerContractView } from "@/components/AnswerContractView";
 import { setUserId } from "@/lib/user";
 import type { AnswerContract } from "@/lib/types";

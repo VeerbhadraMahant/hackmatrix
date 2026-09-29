@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useMemo, useCallback } from "react";
-import { motion, AnimatePresence, useInView, useReducedMotion } from "framer-motion";
-import { Sparkles, Info, Eye } from "lucide-react";
+import { motion } from "framer-motion";
+import { Info, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 
@@ -73,6 +73,8 @@ export interface SankeyDiagramProps {
   className?: string;
 }
 
+const colX = [60, 360, 680]; // X positions for level 0, 1, 2
+
 export function SankeyDiagram({
   title = "Visualize the Flow of Money",
   subtitle = "Interactive Sankey flow model illustrating how monthly inflow distributes seamlessly across debt obligations, living expenses, and wealth accumulation channels.",
@@ -81,15 +83,12 @@ export function SankeyDiagram({
   className,
 }: SankeyDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(containerRef, { amount: 0.2, once: true });
-  const shouldReduceMotion = useReducedMotion();
 
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
 
   // SVG Geometry Constants
   const width = 860;
   const height = 440;
-  const colX = [60, 360, 680]; // X positions for level 0, 1, 2
   const nodeWidth = 14;
   const totalScaleHeight = 360;
 

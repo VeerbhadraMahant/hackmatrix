@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingDown, TrendingUp, Sparkles, Calendar } from "lucide-react";
+import { TrendingDown, TrendingUp, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 

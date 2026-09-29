@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowDownLeft,
@@ -25,7 +24,6 @@ import {
   Search,
   ShoppingBag,
   ShoppingCart,
-  Sparkles,
   TrendingUp,
   Utensils,
   Zap,
@@ -33,7 +31,9 @@ import {
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { useAsync, useUserId } from "@/lib/hooks";
+import { useAsync, useDebouncedValue, useUserId } from "@/lib/hooks";
+import { isDemoUserId } from "@/lib/user";
+import { AddDataPanel } from "@/components/dashboard/AddDataPanel";
 import type { Transaction, TxnCategory } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -100,6 +100,8 @@ const PAGE_SIZE = 25;
 export default function TransactionsPage() {
   const userId = useUserId();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const [showAdd, setShowAdd] = useState(false);
   const [category, setCategory] = useState<TxnCategory | "">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -112,16 +114,20 @@ export default function TransactionsPage() {
   const fetchTransactions = useCallback(
     () =>
       api.transactions(userId, {
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         category: category || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         page,
         page_size: PAGE_SIZE,
       }),
-    [userId, search, category, dateFrom, dateTo, page]
+    [userId, debouncedSearch, category, dateFrom, dateTo, page]
   );
-  const { data, error, loading, reload } = useAsync(fetchTransactions, [userId, search, category, dateFrom, dateTo, page]);
+  const { data, error, loading, reload } = useAsync(
+    fetchTransactions,
+    [userId, debouncedSearch, category, dateFrom, dateTo, page],
+    { identity: userId }
+  );
 
   function resetToFirstPage() {
     setPage(1);
@@ -157,9 +163,10 @@ export default function TransactionsPage() {
   }
 
   // Client-side filtering and sorting for active page items
+  const pageItems = data?.items;
   const displayItems = useMemo(() => {
-    if (!data?.items) return [];
-    let items = [...data.items];
+    if (!pageItems) return [];
+    let items = [...pageItems];
 
     if (activeQuickFilter === "high_value") {
       items = items.filter((t) => Math.abs(t.amount) > 5000);
@@ -182,7 +189,7 @@ export default function TransactionsPage() {
     });
 
     return items;
-  }, [data?.items, activeQuickFilter, sortField, sortDirection]);
+  }, [pageItems, activeQuickFilter, sortField, sortDirection]);
 
   function handleExportCSV() {
     const itemsToExport = displayItems.length > 0 ? displayItems : data?.items ?? [];
@@ -270,6 +277,21 @@ export default function TransactionsPage() {
           })}
         </div>
       </div>
+
+      {!isDemoUserId(userId) && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <Button variant="secondary" size="sm" onClick={() => setShowAdd((v) => !v)} className="text-xs font-semibold">
+              {showAdd ? "Close" : "+ Add transaction"}
+            </Button>
+          </div>
+          {showAdd && (
+            <Card className="p-5 sm:p-6">
+              <AddDataPanel userId={userId} />
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Primary Search & Date Filter Bar */}
       <Card className="p-4 sm:p-5">

@@ -45,7 +45,7 @@ Design decisions (documented here since they aren't dictated anywhere else):
 from __future__ import annotations
 
 import statistics
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd

@@ -7,17 +7,11 @@ import {
   TrendingUp,
   ShieldCheck,
   Zap,
-  CreditCard,
   Coffee,
   Cloud,
   Home,
-  CheckCircle2,
   Sparkles,
-  Sliders,
   DollarSign,
-  PieChart,
-  ArrowDownRight,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";

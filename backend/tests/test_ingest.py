@@ -1,7 +1,6 @@
 """Tests for app.ingest: persona generator, CSV upload parser, categorizer."""
 from __future__ import annotations
 
-import io
 from collections import defaultdict
 
 from app.core.config import get_settings

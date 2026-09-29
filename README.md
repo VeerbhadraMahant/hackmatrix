@@ -329,7 +329,7 @@ One Vercel project, two services (see `vercel.json`): the Next.js **frontend** (
 
 **Data persistence caveat:** without `DATABASE_URL`, the backend uses SQLite in `/tmp` on Vercel -- it is per-instance and ephemeral, so the demo personas are re-seeded on every cold start but data a signed-in user enters will not reliably persist. Point `DATABASE_URL` at a Postgres database for real persistence (note: the `supabase/migrations` tables are a different schema from the backend's SQLModel one).
 
-Local dev is unchanged: run uvicorn and `npm run dev` separately (frontend talks to `http://localhost:8000`).
+Local dev is unchanged: run uvicorn and `npm run dev` separately (frontend talks to `http://127.0.0.1:8000`; use `127.0.0.1` rather than `localhost` for the API, since `localhost` can resolve to IPv6 first and add ~2s per request).
 
 ## 👥 Seeded Demo Personas
 

@@ -72,7 +72,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-semibold text-ink">Could not load financial snapshot</h3>
           <p className="text-xs text-graphite mt-1 max-w-md">{error}</p>
           <p className="text-[11px] text-pewter mt-1">
-            Ensure the backend server is running{process.env.NODE_ENV === "production" ? "." : ` on ${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}`}
+            Ensure the backend server is running{process.env.NODE_ENV === "production" ? "." : ` on ${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"}`}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={reload} className="mt-2">
@@ -98,7 +98,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Add your first data</CardTitle>
           </CardHeader>
-          <AddDataPanel userId={userId} onAdded={reload} />
+          <AddDataPanel userId={userId} />
         </Card>
       </div>
     );
@@ -158,7 +158,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Add data</CardTitle>
           </CardHeader>
-          <AddDataPanel userId={userId} onAdded={reload} />
+          <AddDataPanel userId={userId} />
         </Card>
       )}
 

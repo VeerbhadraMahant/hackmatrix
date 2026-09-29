@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   Car,
-  Check,
   CheckCircle2,
   Clock,
   Home,
@@ -15,7 +14,6 @@ import {
   Sparkles,
   Target,
   Trash2,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -27,7 +25,6 @@ import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 interface GoalVisualMeta {
   icon: LucideIcon;
@@ -64,7 +61,8 @@ const GOAL_TEMPLATES = [
 export default function GoalsPage() {
   const userId = useUserId();
   const fetchGoals = useCallback(() => api.goals(userId), [userId]);
-  const { data, error, loading, reload } = useAsync(fetchGoals, [userId]);
+  const { data, error, loading, reload, mutate } = useAsync(fetchGoals, [userId]);
+  const patchGoals = (fn: (goals: GoalProgress[]) => GoalProgress[]) => mutate((prev) => fn(prev ?? []));
 
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
@@ -84,17 +82,40 @@ export default function GoalsPage() {
     }
     setCreating(true);
     setCreateError(null);
+    // Optimistic: show the new goal (and clear the form) immediately; the
+    // post-write data-changed refetch swaps in the server's real record.
+    const draft = { name: name.trim(), amount, date: targetDate };
+    patchGoals((goals) => [
+      ...goals,
+      {
+        goal: {
+          id: `tmp-${Date.now()}`,
+          user_id: userId,
+          name: draft.name,
+          target_amount: draft.amount,
+          target_date: draft.date || null,
+          current_amount: 0,
+        },
+        monthly_contribution: 0,
+        projected_completion_date: null,
+        on_track: false,
+        months_remaining: null,
+      },
+    ]);
+    setName("");
+    setTargetAmount("");
+    setTargetDate("");
     try {
       await api.createGoal(userId, {
-        name: name.trim(),
-        target_amount: amount,
-        target_date: targetDate || undefined,
+        name: draft.name,
+        target_amount: draft.amount,
+        target_date: draft.date || undefined,
       });
-      setName("");
-      setTargetAmount("");
-      setTargetDate("");
-      reload();
     } catch (err) {
+      reload();
+      setName(draft.name);
+      setTargetAmount(String(draft.amount));
+      setTargetDate(draft.date);
       setCreateError(err instanceof Error ? err.message : "Could not create goal");
     } finally {
       setCreating(false);
@@ -276,7 +297,7 @@ export default function GoalsPage() {
       {goals.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {goals.map((gp) => (
-            <TactileGoalCard key={gp.goal.id} progress={gp} userId={userId} onChanged={reload} />
+            <TactileGoalCard key={gp.goal.id} progress={gp} userId={userId} onChanged={reload} patchGoals={patchGoals} />
           ))}
         </div>
       )}
@@ -288,10 +309,12 @@ function TactileGoalCard({
   progress,
   userId,
   onChanged,
+  patchGoals,
 }: {
   progress: GoalProgress;
   userId: string;
   onChanged: () => void;
+  patchGoals: (fn: (goals: GoalProgress[]) => GoalProgress[]) => void;
 }) {
   const { goal, monthly_contribution, projected_completion_date, on_track, months_remaining } = progress;
   const pct = goal.target_amount > 0 ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) : 0;
@@ -308,10 +331,15 @@ function TactileGoalCard({
     const amount = customAmount ?? Number(contribution);
     if (!amount || amount <= 0) return;
     setSaving(true);
+    const nextAmount = goal.current_amount + amount;
+    patchGoals((goals) =>
+      goals.map((g) => (g.goal.id === goal.id ? { ...g, goal: { ...g.goal, current_amount: nextAmount } } : g))
+    );
+    setContribution("");
     try {
-      await api.updateGoal(userId, goal.id, { current_amount: goal.current_amount + amount });
-      setContribution("");
-      onChanged();
+      await api.updateGoal(userId, goal.id, { current_amount: nextAmount });
+    } catch {
+      onChanged(); // roll back to the server's truth
     } finally {
       setSaving(false);
     }
@@ -319,9 +347,11 @@ function TactileGoalCard({
 
   async function handleDelete() {
     setDeleting(true);
+    patchGoals((goals) => goals.filter((g) => g.goal.id !== goal.id));
     try {
       await api.deleteGoal(userId, goal.id);
-      onChanged();
+    } catch {
+      onChanged(); // roll back to the server's truth
     } finally {
       setDeleting(false);
     }

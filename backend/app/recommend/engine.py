@@ -24,7 +24,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.recommend.categories import PROTECTED_CATEGORIES, is_flexible
+from app.recommend.categories import is_flexible
 from app.schemas import (
     ActionType,
     CashFlowForecast,

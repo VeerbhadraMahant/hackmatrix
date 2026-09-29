@@ -73,34 +73,33 @@ function CountUpNumber({
   isCount?: boolean;
   countSuffix?: string;
 }) {
-  const [displayValue, setDisplayValue] = useState(value);
+  const [animatedValue, setAnimatedValue] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const isInView = useInView(ref, { once: true });
   const shouldReduceMotion = useReducedMotion();
+  // Reduced-motion users get the final value straight away (no animation).
+  const displayValue = shouldReduceMotion ? value : animatedValue;
 
   useEffect(() => {
-    if (shouldReduceMotion) {
-      setDisplayValue(value);
-      return;
-    }
+    if (shouldReduceMotion) return;
 
     const duration = 1000; // ms
     const startTime = performance.now();
-    setDisplayValue(0);
+    let frame = 0;
 
     function update(time: number) {
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setDisplayValue(Math.round(ease * value));
+      setAnimatedValue(Math.round(ease * value));
 
       if (progress < 1) {
-        requestAnimationFrame(update);
+        frame = requestAnimationFrame(update);
       }
     }
 
-    const anim = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(anim);
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
   }, [isInView, value, shouldReduceMotion]);
 
   return (

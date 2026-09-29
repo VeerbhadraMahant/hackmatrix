@@ -2,9 +2,8 @@
 
 import { useRef, useCallback } from "react";
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from "framer-motion";
-import { Laptop, Smartphone, Sparkles, CheckCircle2, Shield, ArrowUpRight } from "lucide-react";
+import { Sparkles, CheckCircle2, Shield, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
 
 export interface DeviceMockupSectionProps {
   title?: string;

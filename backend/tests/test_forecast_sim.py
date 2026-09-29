@@ -17,11 +17,8 @@ from app.ingest.fixtures import demo_dashboard_snapshot
 from app.recommend.engine import generate_recommendations
 from app.schemas import (
     ActionType,
-    Debt,
-    HealthScore,
     RecurrenceFrequency,
     RecurringObligation,
-    SubScore,
     TxnCategory,
 )
 from app.simulate.engine import ForecastInputs, simulate

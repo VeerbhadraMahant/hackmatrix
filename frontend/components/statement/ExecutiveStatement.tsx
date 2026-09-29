@@ -4,16 +4,7 @@ import React from "react";
 import type { DashboardSnapshot, Account } from "@/lib/types";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import {
-  ShieldCheck,
-  CheckCircle2,
-  TrendingUp,
-  AlertTriangle,
-  ArrowRight,
-  FileCheck2,
-  Activity,
-  Calendar,
-} from "lucide-react";
+import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -80,13 +71,11 @@ export function ExecutiveStatement({ dashboard, accounts, userId }: ExecutiveSta
   let minP10 = startPoint.p10;
   let minP50 = startPoint.p50;
   let maxP90 = startPoint.p90;
-  let gapRisksCount = 0;
 
   for (const pt of forecastPoints) {
     if (pt.p10 < minP10) minP10 = pt.p10;
     if (pt.p50 < minP50) minP50 = pt.p50;
     if (pt.p90 > maxP90) maxP90 = pt.p90;
-    if (pt.is_gap_risk) gapRisksCount++;
   }
 
   const netMonthlyDelta = dashboard.monthly_income - dashboard.monthly_expenses;
@@ -95,7 +84,6 @@ export function ExecutiveStatement({ dashboard, accounts, userId }: ExecutiveSta
   // Account groupings
   const liquidAccounts = accounts.filter((a) => a.type === "checking" || a.type === "savings");
   const investmentAccounts = accounts.filter((a) => a.type === "investment");
-  const liabilityAccounts = accounts.filter((a) => a.type === "credit_card" || a.type === "loan");
 
   const totalLiquid = liquidAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalInvestments = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);

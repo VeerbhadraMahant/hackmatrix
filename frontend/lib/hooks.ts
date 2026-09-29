@@ -25,23 +25,52 @@ export function useUserId(): string {
 interface AsyncState<T> {
   data: T | null;
   error: string | null;
+  /** True only for a first/blank load (no data to show yet). Background
+   * refreshes keep the current data on screen and leave this false. */
   loading: boolean;
 }
 
-/** Minimal fetch-on-mount hook -- no react-query dependency needed for this scope. */
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T> & { reload: () => void } {
+/** Fired on `window` after any successful write through lib/api.ts, so
+ * every mounted useAsync() quietly refetches and no panel is left stale. */
+export const DATA_CHANGED_EVENT = "finpilot:data_changed";
+
+function sameDeps(a: unknown[], b: unknown[]) {
+  return a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+}
+
+/**
+ * Minimal fetch-on-mount hook -- no react-query dependency needed for this scope.
+ *
+ * Stale-while-revalidate: changing `deps` (e.g. switching user) resets to a
+ * blank loading state, but `reload()` and the global data-changed event keep
+ * the current data visible while refetching, so the UI never flashes back to
+ * a skeleton after an edit. `mutate` lets callers apply optimistic updates.
+ *
+ * `options.identity`: when given, only a change of *that* value blanks the
+ * view (e.g. the user id); other dep changes (filters, page) keep the
+ * previous rows on screen until the new ones arrive.
+ */
+export function useAsync<T>(
+  fn: () => Promise<T>,
+  deps: unknown[],
+  options?: { identity?: unknown }
+): AsyncState<T> & { reload: () => void; mutate: (update: (prev: T | null) => T | null) => void } {
   const [state, setState] = useState<AsyncState<T>>({ data: null, error: null, loading: true });
   const [tick, setTick] = useState(0);
-  const isFirstRun = useRef(true);
+  const prevDeps = useRef<unknown[] | null>(null);
+  const prevIdentity = useRef<unknown>(options?.identity);
 
   useEffect(() => {
     let cancelled = false;
-    // Skip the redundant reset on the very first run -- initial state is
-    // already {loading: true}; subsequent dep/tick changes do need it.
-    if (!isFirstRun.current) {
+    // Only a real deps change (not a tick-only refresh) blanks the view.
+    const depsChanged = prevDeps.current !== null && !sameDeps(prevDeps.current, deps);
+    prevDeps.current = deps;
+    const identityChanged = !Object.is(prevIdentity.current, options?.identity);
+    prevIdentity.current = options?.identity;
+    const mustBlank = options && "identity" in options ? identityChanged : depsChanged;
+    if (mustBlank) {
       setState({ data: null, error: null, loading: true });
     }
-    isFirstRun.current = false;
 
     fn()
       .then((data) => {
@@ -49,7 +78,11 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setState({ data: null, error: err instanceof Error ? err.message : "Something went wrong", loading: false });
+          setState((prev) => ({
+            data: mustBlank ? null : prev.data,
+            error: err instanceof Error ? err.message : "Something went wrong",
+            loading: false,
+          }));
         }
       });
     return () => {
@@ -58,5 +91,25 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
 
-  return { ...state, reload: () => setTick((t) => t + 1) };
+  useEffect(() => {
+    const refresh = () => setTick((t) => t + 1);
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, refresh);
+  }, []);
+
+  return {
+    ...state,
+    reload: () => setTick((t) => t + 1),
+    mutate: (update) => setState((prev) => ({ ...prev, data: update(prev.data), error: null })),
+  };
+}
+
+/** Returns `value` after it has stopped changing for `delayMs` (e.g. search-as-you-type). */
+export function useDebouncedValue<T>(value: T, delayMs = 250): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
 }
