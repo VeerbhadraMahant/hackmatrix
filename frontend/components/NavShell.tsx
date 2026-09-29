@@ -19,6 +19,7 @@ const LINKS = [
   { href: "/copilot", label: "Copilot" },
   { href: "/simulate", label: "Simulate" },
   { href: "/timeline", label: "Timeline" },
+  { href: "/statement", label: "Statement" },
   { href: "/security", label: "Security" },
 ];
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { FileText } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -82,7 +84,7 @@ export default function DashboardPage() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col gap-8 pb-12"
+      className="flex flex-col gap-8 pb-12 min-w-0 max-w-full"
     >
       {/* Top Banner: Financial Overview Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/[0.04]">
@@ -99,13 +101,24 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button variant="ghost" size="sm" onClick={reload} className="text-xs">
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Refresh Data
           </Button>
+
+          <Link href="/statement">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="text-xs font-semibold gap-1.5 shadow-xs border-mist hover:border-black/20"
+            >
+              <FileText className="w-3.5 h-3.5 text-ember" />
+              <span>Export Financial Statement</span>
+            </Button>
+          </Link>
         </div>
       </div>
 

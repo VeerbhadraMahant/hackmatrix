@@ -285,3 +285,71 @@ h1, h2, h3, h4, h5, h6 {
 .animate-skeleton-pulse {
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
+
+/* ==========================================================================
+   Executive Financial Statement — Print & PDF Media Stylesheet
+   ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 15mm 15mm;
+  }
+
+  /* Reset layout constraints and hide UI chrome */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #090a0f !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force hide all interactive web application shell components */
+  header,
+  nav,
+  .glass-header,
+  [role="navigation"],
+  .print\:hidden,
+  .no-print,
+  button:not(#executive-statement-document button),
+  input,
+  select,
+  nextjs-portal,
+  #__next-build-watcher {
+    display: none !important;
+  }
+
+  /* Expand main container to full printable width without web padding */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Page break management */
+  .break-inside-avoid,
+  section,
+  table,
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Ensure document card prints crisp without box shadows */
+  #executive-statement-document {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+}
