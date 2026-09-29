@@ -115,7 +115,7 @@ def chat(req: ChatRequest, user_id: str = Depends(_resolve_body_user_id)) -> Ans
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
     chat_limiter.check(user_id)
-    return copilot_answer(user_id, req.message)
+    return copilot_answer(user_id, req.message, force_offline=req.force_offline)
 
 
 @router.post("/simulate/{user_id}", response_model=SimulationResult)

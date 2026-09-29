@@ -300,6 +300,9 @@ class ChatRequest(BaseModel):
     # Additive, backward-compatible: defaults to the demo persona so existing
     # callers that don't send it keep working unchanged.
     user_id: str = "demo-priya"
+    # Privacy preference (Security page toggle): when true, never call the
+    # Gemini API for this message, regardless of whether a key is configured.
+    force_offline: bool = False
 
 
 ChatRole = Literal["user", "assistant"]

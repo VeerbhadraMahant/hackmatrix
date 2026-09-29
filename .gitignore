@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 
+claude.md
+
 # node
 node_modules/
 .next/

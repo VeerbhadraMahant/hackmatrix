@@ -104,3 +104,23 @@ class InsightsSnapshotRow(SQLModel, table=True):
     snapshot_json: str
     health_score: float
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AuditLogRow(SQLModel, table=True):
+    """Security audit trail: every authentication denial (401/403/429) and
+    every successful data-mutating request. `user_id` is nullable because a
+    denied request may fail before any user could be resolved at all (e.g.
+    a malformed token) -- those rows still matter for spotting abuse
+    patterns by IP/path even without an identity attached."""
+
+    __tablename__ = "audit_logs"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, index=True)
+    event_type: str = Field(index=True)  # "auth_denied" | "rate_limited" | "mutation"
+    method: str
+    path: str
+    status_code: int
+    client_ip: str | None = None
+    detail: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)

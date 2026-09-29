@@ -165,6 +165,27 @@ def test_answer_never_raises_on_empty_ish_message():
     assert isinstance(result, AnswerContract)
 
 
+def test_answer_force_offline_skips_gemini_even_when_configured(monkeypatch):
+    """Privacy toggle (Security page): force_offline=True must short-circuit
+    to the offline router even when a Gemini key IS configured -- never call
+    out to a third-party LLM when the user has opted out."""
+
+    class _FakeSettingsWithGemini:
+        has_gemini = True
+        gemini_api_key = "fake-key-should-never-be-used"
+        gemini_model = "gemini-flash-latest"
+
+    monkeypatch.setattr("app.copilot.engine.get_settings", lambda: _FakeSettingsWithGemini())
+
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError("Gemini path was called despite force_offline=True")
+
+    monkeypatch.setattr("app.copilot.engine._gemini_answer", _fail_if_called)
+
+    result = answer("demo-priya", "How am I doing financially?", force_offline=True)
+    assert isinstance(result, AnswerContract)
+
+
 # ---------------------------------------------------------------------------
 # Eval script
 # ---------------------------------------------------------------------------

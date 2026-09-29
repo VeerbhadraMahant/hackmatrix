@@ -82,12 +82,56 @@ supabase/       SQL migrations (RLS-scoped per user)
   `RecomputeDiff` (health score, forecast gap date, recommendation changes).
 
 ### Known gaps
-- The 3 demo personas (below) are reachable via `user_id` on every API
-  route (e.g. `/api/dashboard/demo-arjun`), but the frontend has no persona
-  switcher UI yet — it always shows `demo-priya`.
-- `/api/events` only supports adding a one-off transaction (`kind:
-  "transaction"`); adding a new income source or debt as a timeline event
-  isn't wired up yet.
+- `/api/events` supports adding a one-off transaction or a new recurring
+  obligation (`kind: "transaction"` / `"recurring"`); adding a new income
+  source or debt as a timeline event isn't wired up yet.
+- Rate limiting (see Security below) is in-memory/single-process; a
+  multi-instance production deployment should move it to a shared store.
+
+## Security
+
+FinPilot handles financial data, so security got a dedicated pass rather than
+being an afterthought:
+
+- **Authentication is enforced on every API route.** Every endpoint that
+  takes a `user_id` verifies a real Supabase-issued access token locally
+  against the project's JWKS (`backend/app/core/auth.py`) and requires the
+  token's verified subject to match the requested `user_id` — a signed-in
+  user cannot read or mutate another user's data by changing a URL. The 3
+  seeded demo personas remain reachable with no token, by design: they're
+  fixed public fixture data meant for trying the app without signing in.
+- **Row-level security** is enabled on every Postgres table
+  (`auth.uid() = user_id`), scoped per user.
+- **Two-factor authentication**: a real TOTP second factor (`/security`
+  page) via Supabase's native MFA, independent of the Google OAuth
+  provider — authenticator-app enrollment with a QR code, gated behind a
+  challenge screen at sign-in. (Separately: if your Google account already
+  has 2-Step Verification on, signing in with Google already requires it
+  before FinPilot ever sees a token.)
+- **Rate limiting** on `/api/chat` (30/hour) and `/api/upload` (10/hour) to
+  protect the Gemini API key from abuse and the CSV parser from being
+  hammered.
+- **CSV upload hardening**: 5MB file-size cap and 20,000-row cap to prevent
+  resource-exhaustion.
+- **CORS** locked to `localhost`/`127.0.0.1` in dev; production origins must
+  be set explicitly via `ALLOWED_ORIGINS` (fails closed if unset).
+- **Third-party data disclosure**: when the copilot uses Gemini, a summary
+  of relevant financial data is sent to Google's API to ground the answer.
+  This is disclosed on the `/security` page, and an **offline-mode toggle**
+  there forces every copilot answer through the local rule-based router
+  instead, so nothing ever leaves the app for privacy-conscious users.
+- **Audit trail**: every authentication denial and every successful
+  data-mutating request is persisted to `audit_logs`
+  (`backend/app/core/audit.py`), queryable per user via its own RLS policy.
+- Secrets are never committed (`.env*` gitignored, verified absent from git
+  history); the frontend only ever holds Supabase's anon key, never the
+  service-role key.
+
+**Documented, not (yet) implemented**: production-grade JWKS caching
+across multiple backend instances (current caching is per-process);
+Redis-backed rate limiting for horizontal scaling; field-level encryption
+for any future sensitive fields beyond what Supabase's managed Postgres
+already encrypts at rest.
 
 ## Demo personas
 Seeded via `python -m app.ingest.seed` (from `backend/`), each with 12 months

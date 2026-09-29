@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/copilot", label: "Copilot" },
   { href: "/simulate", label: "Simulate" },
   { href: "/timeline", label: "Timeline" },
+  { href: "/security", label: "Security" },
 ];
 
 /** Segmented control for switching between the seeded demo personas. Calling

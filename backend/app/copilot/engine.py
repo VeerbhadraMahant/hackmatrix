@@ -237,16 +237,26 @@ def _gemini_answer(user_id: str, message: str, history: Optional[list[ChatMessag
     raise RuntimeError(f"Gemini structured-output phase failed: {last_error}")
 
 
-def answer(user_id: str, message: str, history: Optional[list[ChatMessage]] = None) -> AnswerContract:
+def answer(
+    user_id: str,
+    message: str,
+    history: Optional[list[ChatMessage]] = None,
+    force_offline: bool = False,
+) -> AnswerContract:
     """Answer a user's financial question.
 
     Tries the Gemini function-calling engine when a key is configured; on any
     error (network, quota, schema validation, missing SDK, etc.) or when no
     key is configured, falls through to the offline rule-based router. This
     function is designed to never raise.
+
+    `force_offline`: user-controlled privacy preference (see the Security
+    page's "offline mode" toggle) -- when set, financial data never leaves
+    this process for a third-party LLM call, regardless of whether a Gemini
+    key is configured.
     """
     settings = get_settings()
-    if settings.has_gemini:
+    if settings.has_gemini and not force_offline:
         try:
             return _gemini_answer(user_id, message, history)
         except Exception as exc:  # noqa: BLE001 - deliberate broad fallback boundary

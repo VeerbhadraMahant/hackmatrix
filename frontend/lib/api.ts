@@ -6,6 +6,7 @@ import type {
   SimulationResult,
 } from "./types";
 import { createClient } from "./supabase/client";
+import { getOfflineOnly } from "./user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -50,7 +51,7 @@ export const api = {
   chat: (message: string, userId: string) =>
     apiFetch<AnswerContract>("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message, user_id: userId }),
+      body: JSON.stringify({ message, user_id: userId, force_offline: getOfflineOnly() }),
     }),
   simulate: (userId: string, req: SimulationRequest) =>
     apiFetch<SimulationResult>(`/api/simulate/${userId}`, { method: "POST", body: JSON.stringify(req) }),

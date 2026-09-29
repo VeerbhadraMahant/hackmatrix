@@ -39,9 +39,24 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Touch the session so an expiring JWT gets refreshed; result unused here
-  // because route-level checks (in each authed layout) decide access.
-  await supabase.auth.getClaims();
+  // Touch the session so an expiring JWT gets refreshed.
+  const { data: claimsData } = await supabase.auth.getClaims();
+
+  // MFA gate: a real signed-in user (never the demo path, which has no
+  // Supabase session at all) who has enrolled a verified TOTP factor but
+  // hasn't completed it in this session gets sent to the challenge page
+  // before reaching anything else. Users who never enrolled a factor are
+  // unaffected (currentLevel === nextLevel for them, so this is a no-op).
+  const pathname = request.nextUrl.pathname;
+  const isChallengePage = pathname.startsWith("/auth/mfa-challenge");
+  if (claimsData?.claims && !isChallengePage) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/mfa-challenge";
+      return NextResponse.redirect(url);
+    }
+  }
 
   return response;
 }

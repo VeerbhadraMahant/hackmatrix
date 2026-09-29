@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
+import { getOfflineOnly, setOfflineOnly } from "@/lib/user";
 import type { AnswerContract } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -58,11 +59,26 @@ export default function CopilotPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-display text-3xl text-ink">Copilot</h1>
-        <p className="mt-1 text-sm text-graphite">
-          Ask about your finances. Every answer separates what&apos;s observed, predicted, and recommended.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Copilot</h1>
+          <p className="mt-1 text-sm text-graphite">
+            Ask about your finances. Every answer separates what&apos;s observed, predicted, and recommended.
+          </p>
+        </div>
+        {/* Uncontrolled (defaultChecked, not checked) so the initial value
+            read from localStorage never causes an SSR/client hydration
+            mismatch warning -- see Security page for the full explanation
+            of what this does. */}
+        <label className="flex shrink-0 items-center gap-2 text-xs text-pewter">
+          <input
+            type="checkbox"
+            defaultChecked={getOfflineOnly()}
+            onChange={(e) => setOfflineOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-mist accent-ink"
+          />
+          Offline mode (never call Gemini)
+        </label>
       </div>
 
       {turns.length === 0 && (
