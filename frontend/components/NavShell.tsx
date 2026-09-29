@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
 import { NotificationBell } from "@/components/NotificationBell";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, setUserId } from "@/lib/user";
 
@@ -128,13 +127,12 @@ export function NavShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
-          {/* Right actions: Persona Switcher + Notification Bell + Theme Toggle + Sign In + Mobile Toggle */}
+          {/* Right actions: Persona Switcher + Notification Bell + Sign In + Mobile Toggle */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="hidden sm:block">
               <PersonaSwitcher />
             </div>
             <NotificationBell userId={userId} />
-            <ThemeToggle />
             <div className="hidden lg:block">
               <SignInButton />
             </div>
@@ -199,11 +197,7 @@ export function NavShell({ children }: { children: ReactNode }) {
                     );
                   })}
                 </div>
-                <div className="mt-3 pt-3 border-t border-mist flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-graphite">Theme</span>
-                    <ThemeToggle />
-                  </div>
+                <div className="mt-3 pt-3 border-t border-mist">
                   <SignInButton />
                 </div>
               </div>
