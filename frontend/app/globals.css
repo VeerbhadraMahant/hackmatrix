@@ -30,6 +30,19 @@
 
   --radius-chip: 6px;
   --radius-surface: 12px;
+
+  /* Shared motion + stacking scale -- additive only, keeps interactive
+     transitions (buttons, chips, form controls) consistent across pages
+     without every component re-deriving its own duration. */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+
+  --z-dropdown: 20;
+  --z-sticky: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
 }
 
 @theme inline {
@@ -91,4 +104,14 @@ h1, h2, h3, h4 {
    UI only (modals, toasts). */
 .shadow-float {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Skeleton loading placeholder -- see components/ui/Skeleton.tsx. */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
 }

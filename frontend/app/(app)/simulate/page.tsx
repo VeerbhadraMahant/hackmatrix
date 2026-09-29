@@ -7,8 +7,11 @@ import type { ActionType, RecurringObligation, SimulationResult } from "@/lib/ty
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { formatCurrency, formatImpactValue } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type ScenarioKind = "cancel_subscription" | "prepay_debt" | "increase_sip";
 
@@ -26,7 +29,7 @@ export default function SimulatePage() {
   const [extraAmount, setExtraAmount] = useState(2000);
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
-  const { data: dashboard } = useAsync(fetchDashboard, [userId]);
+  const { data: dashboard, loading: dashboardLoading } = useAsync(fetchDashboard, [userId]);
 
   const firstSubscription = dashboard?.recurring_obligations.find((o) => o.category === "subscriptions");
   const activeGroupId = groupId ?? firstSubscription?.group_id ?? null;
@@ -104,37 +107,47 @@ export default function SimulatePage() {
       </div>
 
       <Card className="flex flex-col gap-4">
-        {scenario === "cancel_subscription" && (
-          <SubscriptionPicker
-            obligations={dashboard?.recurring_obligations ?? []}
-            selected={activeGroupId}
-            onSelect={setGroupId}
-          />
-        )}
-
-        {scenario === "prepay_debt" && (
+        {dashboardLoading && !dashboard ? (
           <div className="flex flex-col gap-3">
-            <label htmlFor="simulate-debt-select" className="text-sm font-medium text-ink">
-              Debt
-            </label>
-            <select
-              id="simulate-debt-select"
-              className="rounded-chip border border-mist px-3 py-2 text-sm"
-              value={activeDebtId ?? ""}
-              onChange={(e) => setDebtId(e.target.value)}
-            >
-              {(dashboard?.debts ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
-                  {formatCurrency(d.principal)} principal &middot; {d.interest_rate_apr.toFixed(1)}% APR
-                </option>
-              ))}
-            </select>
-            <AmountSlider label="Extra monthly payment" value={extraAmount} onChange={setExtraAmount} max={20000} />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
           </div>
-        )}
+        ) : (
+          <>
+            {scenario === "cancel_subscription" && (
+              <SubscriptionPicker
+                obligations={dashboard?.recurring_obligations ?? []}
+                selected={activeGroupId}
+                onSelect={setGroupId}
+              />
+            )}
 
-        {scenario === "increase_sip" && (
-          <AmountSlider label="Additional monthly SIP" value={extraAmount} onChange={setExtraAmount} max={20000} />
+            {scenario === "prepay_debt" && (
+              <div className="flex flex-col gap-3">
+                <label htmlFor="simulate-debt-select" className="text-sm font-medium text-ink">
+                  Debt
+                </label>
+                <select
+                  id="simulate-debt-select"
+                  className="min-h-11 rounded-chip border border-mist px-3 py-2 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                  value={activeDebtId ?? ""}
+                  onChange={(e) => setDebtId(e.target.value)}
+                >
+                  {(dashboard?.debts ?? []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {formatCurrency(d.principal)} principal &middot; {d.interest_rate_apr.toFixed(1)}% APR
+                    </option>
+                  ))}
+                </select>
+                <AmountSlider label="Extra monthly payment" value={extraAmount} onChange={setExtraAmount} max={20000} />
+              </div>
+            )}
+
+            {scenario === "increase_sip" && (
+              <AmountSlider label="Additional monthly SIP" value={extraAmount} onChange={setExtraAmount} max={20000} />
+            )}
+          </>
         )}
 
         <Button variant="primary" onClick={run} disabled={!canRun || running} className="self-start">
@@ -207,7 +220,12 @@ function SubscriptionPicker({
   onSelect: (id: string) => void;
 }) {
   if (obligations.length === 0) {
-    return <p className="text-sm text-pewter">No recurring obligations found for this account.</p>;
+    return (
+      <EmptyState
+        title="No recurring obligations found"
+        body="Subscriptions detected in this account's transaction history will show up here."
+      />
+    );
   }
   return (
     <div className="flex flex-col gap-2">
@@ -219,10 +237,11 @@ function SubscriptionPicker({
             <button
               key={o.group_id}
               onClick={() => onSelect(o.group_id)}
-              className={
-                "flex items-center justify-between rounded-chip border px-3 py-2 text-left text-sm " +
-                (selected === o.group_id ? "border-ink bg-fog" : "border-mist hover:bg-fog")
-              }
+              className={cn(
+                "flex min-h-11 items-center justify-between rounded-chip border px-3 py-2 text-left text-sm transition-colors duration-200",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                selected === o.group_id ? "border-ink bg-fog" : "border-mist hover:bg-fog"
+              )}
             >
               <span>{o.merchant}</span>
               <span className="font-medium">{formatCurrency(Math.abs(o.amount))}/mo</span>
@@ -257,7 +276,7 @@ function AmountSlider({
         step={500}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-ember"
+        className="h-11 accent-ember focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
       />
     </div>
   );
