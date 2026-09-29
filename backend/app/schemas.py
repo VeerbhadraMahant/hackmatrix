@@ -313,3 +313,69 @@ class ChatMessage(BaseModel):
     content: str
     answer: Optional[AnswerContract] = None
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Goals (added by goals-networth-backend-agent -- wraps
+# app.analytics.goals.project_goal's dict output in a typed shape, and
+# request bodies for the goals CRUD routes).
+# ---------------------------------------------------------------------------
+
+
+class GoalCreateRequest(BaseModel):
+    name: str
+    target_amount: float
+    target_date: Optional[date] = None
+    current_amount: float = 0
+
+
+class GoalUpdateRequest(BaseModel):
+    """All fields optional -- PATCH semantics (only provided fields change)."""
+
+    current_amount: Optional[float] = None
+    target_amount: Optional[float] = None
+    target_date: Optional[date] = None
+    name: Optional[str] = None
+
+
+class GoalProgress(BaseModel):
+    goal: Goal
+    monthly_contribution: float
+    projected_completion_date: Optional[date] = None
+    on_track: bool
+    months_remaining: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------
+# Net worth over time (added by goals-networth-backend-agent -- reconstructed
+# live from Account + Transaction history, not a stored table).
+# ---------------------------------------------------------------------------
+
+
+class NetWorthPoint(BaseModel):
+    date: date
+    net_worth: float
+
+
+class NetWorthHistory(BaseModel):
+    points: list[NetWorthPoint]
+    current: float
+
+
+# ---------------------------------------------------------------------------
+# Notifications feed (added by goals-networth-backend-agent -- live-computed
+# merge of anomalies / recommendations / upcoming bills / cash-flow gaps,
+# not persisted).
+# ---------------------------------------------------------------------------
+
+NotificationType = Literal["anomaly", "recommendation", "upcoming_bill", "cash_flow_gap"]
+NotificationSeverity = Literal["info", "warning", "critical"]
+
+
+class NotificationItem(BaseModel):
+    id: str
+    type: NotificationType
+    severity: NotificationSeverity
+    text: str
+    date: date
+    source_ref: Optional[str] = None
