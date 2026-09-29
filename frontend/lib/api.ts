@@ -24,7 +24,11 @@ import type {
 import { createClient } from "./supabase/client";
 import { getOfflineOnly } from "./user";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Production (Vercel multi-service project) serves the backend on the same
+// origin under /api, so default to relative URLs there; local dev talks to
+// the separate uvicorn server. NEXT_PUBLIC_API_URL overrides either.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
 const AUTH_HEADER_TIMEOUT_MS = 2000;
 

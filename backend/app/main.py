@@ -21,6 +21,11 @@ _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    if os.getenv("VERCEL"):
+        # Fresh ephemeral sqlite on every cold start -- restore the demo personas.
+        from app.ingest.seed import seed_if_empty
+
+        seed_if_empty()
     yield
 
 

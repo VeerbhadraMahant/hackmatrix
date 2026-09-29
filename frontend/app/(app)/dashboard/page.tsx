@@ -72,7 +72,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-semibold text-ink">Could not load financial snapshot</h3>
           <p className="text-xs text-graphite mt-1 max-w-md">{error}</p>
           <p className="text-[11px] text-pewter mt-1">
-            Ensure backend server is running on {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}
+            Ensure the backend server is running{process.env.NODE_ENV === "production" ? "." : ` on ${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}`}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={reload} className="mt-2">

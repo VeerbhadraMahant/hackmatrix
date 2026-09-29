@@ -25,7 +25,13 @@ class Settings:
     supabase_project_ref: str = os.getenv("SUPABASE_PROJECT_REF", "")
 
     # Database (direct Postgres connection, falls back to local sqlite for offline dev/tests)
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./finpilot_dev.db")
+    # On Vercel the deployment filesystem is read-only except /tmp, so the
+    # sqlite fallback lives there (per-instance and ephemeral -- set
+    # DATABASE_URL to a real Postgres for data that must persist).
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:////tmp/finpilot.db" if os.getenv("VERCEL") else "sqlite:///./finpilot_dev.db",
+    )
 
     # Gemini
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")

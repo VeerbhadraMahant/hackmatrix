@@ -9,7 +9,7 @@ duplicates.
 """
 from __future__ import annotations
 
-from sqlmodel import Session, delete
+from sqlmodel import Session, delete, select
 
 from app.core.db import engine, init_db
 from app.models import AccountRow, DebtRow, IncomeRow, TransactionRow
@@ -48,6 +48,15 @@ def seed_all() -> None:
                 f"{len(data.transactions)} transactions, {len(data.debts)} debts, "
                 f"{len(data.incomes)} incomes"
             )
+
+
+def seed_if_empty() -> None:
+    """Seed the demo personas only if they're missing (fresh/ephemeral DB,
+    e.g. a serverless cold start). Cheap no-op otherwise."""
+    init_db()
+    with Session(engine) as session:
+        if session.exec(select(AccountRow).where(AccountRow.user_id == "demo-priya")).first() is None:
+            seed_all()
 
 
 if __name__ == "__main__":
