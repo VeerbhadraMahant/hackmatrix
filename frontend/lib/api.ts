@@ -25,21 +25,34 @@ import { getOfflineOnly } from "./user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+const AUTH_HEADER_TIMEOUT_MS = 2000;
+
 /** The backend now verifies a real Supabase session token for any user_id
  * that isn't one of the fixed demo personas (see backend/app/core/auth.py)
  * -- attach it whenever one exists. Demo-only usage (no signed-in session)
  * simply omits the header, which the backend already allows for the demo
- * personas. */
+ * personas.
+ *
+ * This runs before EVERY API call, including plain demo-mode traffic that
+ * needs no auth at all -- so it must never be allowed to hang. supabase-js's
+ * getSession() can stall indefinitely in some environments (unreachable
+ * auth endpoint, a blocked/slow Web Locks API used for its cross-tab session
+ * mutex), which would otherwise freeze the entire app on every page load.
+ * Race it against a short timeout and fall back to unauthenticated. */
 async function authHeader(): Promise<Record<string, string>> {
   try {
     const supabase = createClient();
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("auth session lookup timed out")), AUTH_HEADER_TIMEOUT_MS)
+    );
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await Promise.race([supabase.auth.getSession(), timeout]);
     return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
   } catch {
-    // Supabase env vars unset in this environment, or no session -- fall
-    // back to unauthenticated (demo-only) requests rather than failing.
+    // Supabase env vars unset, no session, network unreachable, or the
+    // lookup timed out -- fall back to unauthenticated (demo-only)
+    // requests rather than blocking the app.
     return {};
   }
 }
