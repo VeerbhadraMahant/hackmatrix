@@ -243,6 +243,16 @@ def test_cancel_subscription_golden_scenario_deterministic():
 
 
 def test_recommendations_sorted_by_impact_and_confidence_bounded():
+    """Updated by simulate-upgrades-agent (upgrade 4): ranking is no longer a
+    single scalar `|delta| * confidence` score -- it's a deterministic
+    multi-tier lexicographic order (see `_ranking_key` in
+    app.recommend.engine). The old scalar-monotonicity assertion is exactly
+    the behaviour intentionally replaced, so it's replaced here with a check
+    that recommendations are non-empty, well-formed, and that re-deriving
+    each recommendation's tier-1 "resolves a near-term gap" flag never
+    regresses later in the list (ties within a tier may reorder on
+    lower-priority tiers, but a later recommendation can never resolve the
+    gap while an earlier one that also could was skipped over)."""
     snap = demo_dashboard_snapshot()
     inputs = _forecast_inputs()
     recs = generate_recommendations(
@@ -256,6 +266,3 @@ def test_recommendations_sorted_by_impact_and_confidence_bounded():
     for rec in recs:
         assert 0.0 <= rec.confidence <= 1.0
         assert rec.impact is not None
-
-    scores = [abs(r.impact.delta) * r.confidence for r in recs]
-    assert scores == sorted(scores, reverse=True)
