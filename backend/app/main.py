@@ -7,6 +7,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.budgets_router import router as budgets_router
+from app.api.goals_router import router as goals_router
+from app.api.networth_router import router as networth_router
+from app.api.notifications_router import router as notifications_router
 from app.api.routes import router
 from app.api.transactions_router import router as transactions_router
 from app.core.audit import log_audit_event
@@ -43,6 +46,12 @@ app.add_middleware(
 app.include_router(router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(budgets_router, prefix="/api")
+# These three already embed "/api/..." in each route's own path decorator
+# (unlike routes.py/transactions_router/budgets_router, which rely on the
+# prefix="/api" above) -- no prefix here, or paths would double up.
+app.include_router(goals_router)
+app.include_router(networth_router)
+app.include_router(notifications_router)
 
 
 @app.middleware("http")
@@ -66,12 +75,15 @@ async def audit_log_middleware(request: Request, call_next):
         # user_id is always the 3rd segment for these resources (even when
         # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
         # or /api/transactions/{user_id}/{transaction_id}).
-        if parts[1] in {"transactions", "budgets"}:
+        if parts[1] in {"transactions", "budgets", "goals"}:
             return parts[2]
         # For these, user_id is the LAST segment (/api/dashboard/{user_id},
-        # /api/alerts/gap/{user_id}, etc.).
-        if parts[1] in {"dashboard", "simulate", "upload", "events", "alerts"}:
+        # /api/alerts/gap/{user_id}, /api/accounts/{user_id}, etc.).
+        if parts[1] in {"dashboard", "simulate", "upload", "events", "alerts", "accounts", "notifications"}:
             return parts[-1]
+        # /api/networth/{user_id}/history
+        if parts[1] == "networth":
+            return parts[2]
         return None
 
     try:
