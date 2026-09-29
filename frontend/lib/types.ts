@@ -173,3 +173,133 @@ export interface SimulationResult {
   impact: ImpactEstimate;
   confidence: number;
 }
+
+/**
+ * Types below mirror the transactions/budgets/goals/net-worth/notifications
+ * routers being built by sibling agents in parallel -- not live yet at the
+ * time of writing, but shapes are fixed by the shared spec. Additive only.
+ */
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  date: string;
+  merchant: string;
+  category: TxnCategory;
+  amount: number;
+  account_id: string;
+}
+
+export interface TransactionPage {
+  items: Transaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface TransactionFilters {
+  category?: TxnCategory;
+  merchant?: string;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface TransactionUpdate {
+  category?: TxnCategory;
+  merchant?: string;
+}
+
+export interface Budget {
+  id: string;
+  user_id: string;
+  category: TxnCategory;
+  monthly_limit: number;
+}
+
+export interface CreateBudgetRequest {
+  category: TxnCategory;
+  monthly_limit: number;
+}
+
+export type BudgetHealth = "under" | "near" | "over";
+
+export interface BudgetStatus {
+  category: TxnCategory;
+  monthly_limit: number;
+  spent_so_far: number;
+  remaining: number;
+  percent_used: number;
+  status: BudgetHealth;
+}
+
+export interface SafeToSpend {
+  amount: number;
+  basis: string;
+  as_of_date: string;
+}
+
+export interface Goal {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: number;
+  target_date: string | null;
+  current_amount: number;
+}
+
+export interface GoalProgress {
+  goal: Goal;
+  monthly_contribution: number;
+  projected_completion_date: string | null;
+  on_track: boolean;
+  months_remaining: number | null;
+}
+
+export interface CreateGoalRequest {
+  name: string;
+  target_amount: number;
+  target_date?: string | null;
+  current_amount?: number;
+}
+
+export interface UpdateGoalRequest {
+  current_amount?: number;
+  target_date?: string | null;
+  target_amount?: number;
+}
+
+export interface NetWorthPoint {
+  date: string;
+  net_worth: number;
+}
+
+export interface NetWorthHistory {
+  points: NetWorthPoint[];
+  current: number;
+}
+
+export interface Account {
+  id: string;
+  user_id: string;
+  name: string;
+  type: AccountType;
+  balance: number;
+  credit_limit: number | null;
+  interest_rate_apr: number | null;
+  currency: string;
+}
+
+export type NotificationType = "anomaly" | "recommendation" | "upcoming_bill" | "cash_flow_gap";
+export type NotificationSeverity = "info" | "warning" | "critical";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  severity: NotificationSeverity;
+  text: string;
+  date: string;
+  source_ref: string | null;
+}

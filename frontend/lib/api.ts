@@ -1,9 +1,24 @@
 import type {
+  Account,
   AnswerContract,
+  Budget,
+  BudgetStatus,
+  CreateBudgetRequest,
+  CreateGoalRequest,
   DashboardSnapshot,
+  Goal,
+  GoalProgress,
+  NetWorthHistory,
+  NotificationItem,
   RecomputeDiff,
+  SafeToSpend,
   SimulationRequest,
   SimulationResult,
+  Transaction,
+  TransactionFilters,
+  TransactionPage,
+  TransactionUpdate,
+  UpdateGoalRequest,
 } from "./types";
 import { createClient } from "./supabase/client";
 import { getOfflineOnly } from "./user";
@@ -38,6 +53,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status} ${await res.text()}`);
   }
+  // DELETE endpoints (e.g. budgets/goals) return 204 with no body -- res.json()
+  // would throw on the empty string, so short-circuit for callers typed <void>.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -57,4 +75,45 @@ export const api = {
     apiFetch<SimulationResult>(`/api/simulate/${userId}`, { method: "POST", body: JSON.stringify(req) }),
   addEvent: (userId: string, payload: Record<string, unknown>) =>
     apiFetch<RecomputeDiff>(`/api/events/${userId}`, { method: "POST", body: JSON.stringify(payload) }),
+
+  // Transactions
+  transactions: (userId: string, filters: TransactionFilters = {}) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+    }
+    const qs = params.toString();
+    return apiFetch<TransactionPage>(`/api/transactions/${userId}${qs ? `?${qs}` : ""}`);
+  },
+  updateTransaction: (userId: string, transactionId: string, update: TransactionUpdate) =>
+    apiFetch<Transaction>(`/api/transactions/${userId}/${transactionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(update),
+    }),
+
+  // Budgets
+  budgets: (userId: string) => apiFetch<Budget[]>(`/api/budgets/${userId}`),
+  createBudget: (userId: string, req: CreateBudgetRequest) =>
+    apiFetch<Budget>(`/api/budgets/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  deleteBudget: (userId: string, budgetId: string) =>
+    apiFetch<void>(`/api/budgets/${userId}/${budgetId}`, { method: "DELETE" }),
+  budgetStatus: (userId: string) => apiFetch<BudgetStatus[]>(`/api/budgets/${userId}/status`),
+  safeToSpend: (userId: string) => apiFetch<SafeToSpend>(`/api/budgets/${userId}/safe-to-spend`),
+
+  // Goals
+  goals: (userId: string) => apiFetch<GoalProgress[]>(`/api/goals/${userId}`),
+  createGoal: (userId: string, req: CreateGoalRequest) =>
+    apiFetch<GoalProgress | Goal>(`/api/goals/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  updateGoal: (userId: string, goalId: string, req: UpdateGoalRequest) =>
+    apiFetch<Goal>(`/api/goals/${userId}/${goalId}`, { method: "PATCH", body: JSON.stringify(req) }),
+  deleteGoal: (userId: string, goalId: string) =>
+    apiFetch<void>(`/api/goals/${userId}/${goalId}`, { method: "DELETE" }),
+
+  // Net worth + accounts
+  netWorthHistory: (userId: string, days = 180) =>
+    apiFetch<NetWorthHistory>(`/api/networth/${userId}/history?days=${days}`),
+  accounts: (userId: string) => apiFetch<Account[]>(`/api/accounts/${userId}`),
+
+  // Notifications
+  notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),
 };
