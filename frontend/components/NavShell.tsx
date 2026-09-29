@@ -9,7 +9,7 @@ import { SignInButton } from "@/components/SignInButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useUserId } from "@/lib/hooks";
-import { DEMO_PERSONAS, setUserId } from "@/lib/user";
+import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -32,6 +32,8 @@ const PERSONA_DETAILS: Record<string, { city: string; tag: string }> = {
 /** Segmented control for switching between the seeded demo personas */
 function PersonaSwitcher() {
   const userId = useUserId();
+  // Signed-in users only see their own data -- no demo personas.
+  if (!isDemoUserId(userId)) return null;
 
   return (
     <div

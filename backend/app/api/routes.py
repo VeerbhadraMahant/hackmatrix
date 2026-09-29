@@ -163,6 +163,12 @@ async def upload_transactions(file: UploadFile, user_id: str = Depends(resolve_u
     with Session(engine) as session:
         before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)
 
+        # A real user with no account yet gets one backing the synthetic id,
+        # so the snapshot leaves the empty placeholder state.
+        has_account = session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).first()
+        if not has_account and user_id not in DEMO_USER_IDS:
+            session.add(AccountRow(id=account_id, user_id=user_id, name="Uploaded statement", type="checking", balance=0))
+
         for row in rows:
             session.add(row)
         session.commit()
@@ -237,7 +243,22 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
         checking = session.exec(
             select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "checking")
         ).first()
-        return checking.id if checking else f"acc-events-{user_id}"
+        if checking:
+            return checking.id
+        savings = session.exec(
+            select(AccountRow).where(AccountRow.user_id == user_id, AccountRow.type == "savings")
+        ).first()
+        if savings and user_id not in DEMO_USER_IDS:
+            return savings.id
+        if user_id in DEMO_USER_IDS:
+            return f"acc-events-{user_id}"
+        # Real user adding their first transaction without any account yet:
+        # create a default one so the snapshot stops being the empty
+        # placeholder (it keys off the user having >= 1 AccountRow).
+        default = AccountRow(user_id=user_id, name="Main account", type="checking", balance=0)
+        session.add(default)
+        session.flush()
+        return default.id
 
     with Session(engine) as session:
         before = get_last_snapshot(user_id, session) or build_dashboard_snapshot(user_id, session)

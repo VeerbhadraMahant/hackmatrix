@@ -146,6 +146,8 @@ export interface DashboardSnapshot {
   forecast: CashFlowForecast;
   insights: AnswerContract;
   generated_at: string;
+  /** false = a real user with no accounts yet; the snapshot is an all-zero placeholder. */
+  has_data: boolean;
 }
 
 export interface RecomputeDiff {
@@ -279,6 +281,12 @@ export interface NetWorthPoint {
 export interface NetWorthHistory {
   points: NetWorthPoint[];
   current: number;
+}
+
+export interface CreateAccountRequest {
+  name: string;
+  type: AccountType;
+  balance: number;
 }
 
 export interface Account {

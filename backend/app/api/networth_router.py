@@ -43,7 +43,7 @@ from sqlmodel import Session, select
 from app.core.auth import resolve_user_id
 from app.core.db import engine
 from app.models import AccountRow, TransactionRow
-from app.schemas import Account, NetWorthHistory, NetWorthPoint
+from app.schemas import Account, CreateAccountRequest, NetWorthHistory, NetWorthPoint
 
 router = APIRouter()
 
@@ -134,3 +134,20 @@ def list_accounts(user_id: str = Depends(resolve_user_id)) -> list[Account]:
     with Session(engine) as session:
         accounts = session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).all()
     return [_account_row_to_schema(a) for a in accounts]
+
+
+@router.post("/api/accounts/{user_id}", response_model=Account, status_code=201)
+def create_account(req: CreateAccountRequest, user_id: str = Depends(resolve_user_id)) -> Account:
+    row = AccountRow(
+        user_id=user_id,
+        name=req.name.strip(),
+        type=req.type.value,
+        balance=req.balance,
+        credit_limit=req.credit_limit,
+        interest_rate_apr=req.interest_rate_apr,
+    )
+    with Session(engine) as session:
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+    return _account_row_to_schema(row)

@@ -88,13 +88,13 @@ def test_snapshot_is_cached_and_retrievable():
     assert cached.health_score.overall == snap.health_score.overall
 
 
-def test_unknown_user_falls_back_to_fixture():
+def test_unknown_user_gets_empty_snapshot():
     with Session(engine) as session:
         snap = build_dashboard_snapshot("totally-unknown-user-id", session)
     assert snap.user_id == "totally-unknown-user-id"
-    # fixture fallback still produces a well-formed snapshot
-    assert 0 <= snap.health_score.overall <= 100
-    assert snap.forecast.points
+    # a real user with no data is NOT shown demo data
+    assert snap.has_data is False
+    assert snap.net_worth == 0 and not snap.forecast.points
 
 
 # ---------------------------------------------------------------------------

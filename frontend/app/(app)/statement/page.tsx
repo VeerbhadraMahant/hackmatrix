@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { DEMO_PERSONAS, setUserId } from "@/lib/user";
+import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 import { ExecutiveStatement } from "@/components/statement/ExecutiveStatement";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -60,8 +60,8 @@ export default function StatementPage() {
 
         {/* Persona Switcher & Print Trigger Button */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Persona quick toggle */}
-          <div
+          {/* Persona quick toggle (demo only -- signed-in users see just their own data) */}
+          {isDemoUserId(userId) && <div
             role="radiogroup"
             aria-label="Switch persona"
             className="flex items-center gap-1 rounded-full border border-mist bg-fog p-1 text-xs"
@@ -84,7 +84,7 @@ export default function StatementPage() {
                 </button>
               );
             })}
-          </div>
+          </div>}
 
           {/* Primary Print / Save as PDF Action */}
           <Button

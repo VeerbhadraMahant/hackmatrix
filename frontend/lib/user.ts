@@ -26,13 +26,44 @@ export const DEMO_PERSONAS: DemoPersona[] = [
   { id: "demo-meera", label: "Meera" },
 ];
 
+/** The signed-in Supabase user's id, mirrored into localStorage by
+ * setAuthUserId() so getUserId() stays synchronous. When present it wins
+ * over the demo persona: a signed-in user only ever sees their own data. */
+const AUTH_USER_KEY = "finpilot:auth_user_id";
+
+export function isDemoUserId(id: string): boolean {
+  return DEMO_PERSONAS.some((p) => p.id === id);
+}
+
 export function getUserId(): string {
   if (typeof window === "undefined") return DEFAULT_USER_ID;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) ?? DEFAULT_USER_ID;
+    return (
+      window.localStorage.getItem(AUTH_USER_KEY) ??
+      window.localStorage.getItem(STORAGE_KEY) ??
+      DEFAULT_USER_ID
+    );
   } catch {
     return DEFAULT_USER_ID;
   }
+}
+
+/** Called from the Supabase auth listener (components/SignInButton.tsx) with
+ * the signed-in user's id, or null on sign-out. */
+export function setAuthUserId(id: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (id) {
+      if (window.localStorage.getItem(AUTH_USER_KEY) === id) return;
+      window.localStorage.setItem(AUTH_USER_KEY, id);
+    } else {
+      if (window.localStorage.getItem(AUTH_USER_KEY) === null) return;
+      window.localStorage.removeItem(AUTH_USER_KEY);
+    }
+  } catch {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(USER_ID_CHANGE_EVENT));
 }
 
 export function setUserId(id: string) {

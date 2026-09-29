@@ -285,6 +285,17 @@ class DashboardSnapshot(BaseModel):
     forecast: CashFlowForecast
     insights: AnswerContract
     generated_at: datetime
+    # False for a real signed-in user who hasn't added any accounts yet --
+    # the snapshot is then an all-zero placeholder, not demo data.
+    has_data: bool = True
+
+
+class CreateAccountRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    type: AccountType
+    balance: float = 0
+    credit_limit: Optional[float] = None
+    interest_rate_apr: Optional[float] = None
 
 
 class RecomputeDiff(BaseModel):

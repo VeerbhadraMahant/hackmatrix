@@ -3,6 +3,7 @@ import type {
   AnswerContract,
   Budget,
   BudgetStatus,
+  CreateAccountRequest,
   CreateBudgetRequest,
   CreateGoalRequest,
   DashboardSnapshot,
@@ -126,6 +127,20 @@ export const api = {
   netWorthHistory: (userId: string, days = 180) =>
     apiFetch<NetWorthHistory>(`/api/networth/${userId}/history?days=${days}`),
   accounts: (userId: string) => apiFetch<Account[]>(`/api/accounts/${userId}`),
+  createAccount: (userId: string, req: CreateAccountRequest) =>
+    apiFetch<Account>(`/api/accounts/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  /** Bank-statement CSV upload (multipart -- so no JSON Content-Type header). */
+  upload: async (userId: string, file: File): Promise<RecomputeDiff> => {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch(`${API_URL}/api/upload/${userId}`, {
+      method: "POST",
+      headers: await authHeader(),
+      body,
+    });
+    if (!res.ok) throw new Error(`API upload failed: ${res.status} ${await res.text()}`);
+    return res.json() as Promise<RecomputeDiff>;
+  },
 
   // Notifications
   notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),

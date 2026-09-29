@@ -61,11 +61,14 @@ from app.forecast.cashflow import build_forecast
 from app.ingest.fixtures import demo_dashboard_snapshot
 from app.models import AccountRow, DebtRow, IncomeRow, InsightsSnapshotRow, TransactionRow
 from app.recommend.engine import generate_recommendations
+from app.core.auth import DEMO_USER_IDS
 from app.schemas import (
     AnswerContract,
+    CashFlowForecast,
     DashboardSnapshot,
     Debt,
     Fact,
+    HealthScore,
     Prediction,
     RecurringObligation,
     TxnCategory,
@@ -203,15 +206,41 @@ def _cache_snapshot(snapshot: DashboardSnapshot, session: Session) -> None:
 # ---------------------------------------------------------------------------
 
 
+def empty_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
+    """All-zero placeholder for a real user who hasn't added any data yet."""
+    now = datetime.now(timezone.utc)
+    return DashboardSnapshot(
+        user_id=user_id,
+        health_score=HealthScore(overall=0, sub_scores=[], computed_at=now),
+        net_worth=0,
+        monthly_income=0,
+        monthly_expenses=0,
+        savings_rate=0,
+        recurring_obligations=[],
+        debts=[],
+        forecast=CashFlowForecast(
+            generated_at=now, horizon_days=_FORECAST_HORIZON_DAYS, points=[], confidence=0,
+            basis="No data yet -- add an account and some transactions to see a forecast.",
+        ),
+        insights=AnswerContract(narrative="Add your first account and transactions to get personalised insights."),
+        generated_at=now,
+        has_data=False,
+    )
+
+
 def build_dashboard_snapshot(user_id: str, session: Session) -> DashboardSnapshot:
     """Build (and cache) a real DashboardSnapshot for `user_id` from the DB.
 
-    Falls back to the Phase-0 fixture (never persisted/cached) if the user
-    has no accounts at all -- i.e. is not a real/seeded user.
+    A demo persona id with no accounts falls back to the Phase-0 fixture
+    (never persisted/cached). Any other user with no accounts is a real,
+    new user: they get an all-zero placeholder (`has_data=False`), never
+    someone else's demo data.
     """
     accounts = session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).all()
     if not accounts:
-        return demo_dashboard_snapshot(user_id)
+        if user_id in DEMO_USER_IDS:
+            return demo_dashboard_snapshot(user_id)
+        return empty_dashboard_snapshot(user_id)
 
     txn_rows = session.exec(select(TransactionRow).where(TransactionRow.user_id == user_id)).all()
     debt_rows = session.exec(select(DebtRow).where(DebtRow.user_id == user_id)).all()
