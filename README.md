@@ -319,6 +319,27 @@ Open **`http://localhost:3000`** in your browser.
 
 ---
 
+## ☁️ Deploying
+
+The **frontend** (Next.js) deploys to Vercel; the **backend** (FastAPI) runs as a separate long-lived service (Render, Railway, Fly, a VM, ...) because it keeps state in a database file and loads pandas/numpy, which suit a server better than serverless functions.
+
+**Frontend on Vercel**
+1. Import the repo and set **Root Directory** to `frontend` (framework auto-detects as Next.js).
+2. Add environment variables (Production and Preview):
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_API_URL` -- the backend's public `https://` URL
+3. Redeploy after changing any `NEXT_PUBLIC_*` value (they are inlined at build time).
+
+**Backend**
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` from `backend/` (`pip install -r requirements.txt` first).
+- Env vars: everything in `.env.example` the backend uses (Supabase URL/keys, `GEMINI_API_KEY`, ...), plus `ALLOWED_ORIGINS=https://<your-vercel-domain>` so the browser is allowed to call it.
+- Data is stored in SQLite (`finpilot_dev.db`) unless `DATABASE_URL` is set, so on a host with an ephemeral disk, user-entered data is lost on restart. Attach a persistent disk, or point `DATABASE_URL` at Postgres that uses the backend's SQLModel schema (the `supabase/migrations` tables are a different schema).
+
+**Supabase (Authentication -> URL Configuration)**
+- Site URL: `https://<your-vercel-domain>`
+- Redirect URLs: add `https://<your-vercel-domain>/auth/callback` (keep `http://localhost:3000/auth/callback` for local dev).
+- Google provider: in Google Cloud, the OAuth client's redirect URI stays `https://<project-ref>.supabase.co/auth/v1/callback`.
+
 ## 👥 Seeded Demo Personas
 
 FinPilot includes 3 realistic personas, each pre-loaded with 12 months of synthetic banking history:
