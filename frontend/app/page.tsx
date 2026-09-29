@@ -55,45 +55,25 @@ export default function Home() {
       {/* Hero Section */}
       <section className="mx-auto flex w-full max-w-[1240px] flex-col items-center text-center px-4 pt-12 pb-10 sm:px-8 sm:pt-20 sm:pb-16">
         {/* Status Pill */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/80 px-3.5 py-1 text-xs font-medium text-graphite shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md mb-6"
-        >
+        <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/80 px-3.5 py-1 text-xs font-medium text-graphite shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md mb-6">
           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>Fintech Intelligence Engine • 90-Day Cash-Flow Modeling</span>
-        </motion.div>
+        </div>
 
         {/* Editorial Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="font-display max-w-4xl text-4xl sm:text-6xl md:text-7xl leading-[1.08] text-ink tracking-tight"
-        >
+        <h1 className="font-display max-w-4xl text-4xl sm:text-6xl md:text-7xl leading-[1.08] text-ink tracking-tight">
           Your financial health, <br />
           <span className="italic font-normal text-ink">explained</span> — not just reported.
-        </motion.h1>
+        </h1>
 
         {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-6 max-w-2xl text-base sm:text-xl text-graphite leading-relaxed"
-        >
+        <p className="mt-6 max-w-2xl text-base sm:text-xl text-graphite leading-relaxed">
           FinPilot reads your transactions, forecasts 90-day cash flow with P10/P90 confidence bands,
           and shows the simulated before → after impact of every financial recommendation.
-        </motion.p>
+        </p>
 
         {/* CTA Group */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mt-8 flex flex-wrap items-center justify-center gap-3.5"
-        >
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
           <Link href="/dashboard">
             <Button variant="primary" size="lg" className="px-7 py-3.5 text-base">
               Explore Live Demo
@@ -102,20 +82,15 @@ export default function Home() {
               </svg>
             </Button>
           </Link>
-          <Link href="/interactive-showcase">
+          <Link href="/simulate">
             <Button variant="secondary" size="lg" className="px-6 py-3.5 text-base">
-              View Interactive Suite
+              Run What-If Simulator
             </Button>
           </Link>
-        </motion.div>
+        </div>
 
         {/* Trust Badges */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-pewter font-medium"
-        >
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-pewter font-medium">
           <span className="flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -134,7 +109,7 @@ export default function Home() {
             </svg>
             Three-lane verified insights
           </span>
-        </motion.div>
+        </div>
       </section>
 
       {/* COMPONENT 6: Device Mockup Section (Desktop + Phone) */}
