@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import type { AnswerContract } from "@/lib/types";
-import { CardTitle } from "@/components/ui/Card";
 import { ConfidenceChip } from "@/components/ui/ConfidenceChip";
 import { Chip } from "@/components/ui/Chip";
 import { formatCurrency, formatImpactValue } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 /**
  * Renders an AnswerContract as three visually distinct, clearly labeled
@@ -23,104 +24,153 @@ export function AnswerContractView({ answer }: { answer: AnswerContract }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {narrative ? <p className="text-sm leading-relaxed text-graphite">{narrative}</p> : null}
+      {narrative && (
+        <div className="rounded-surface border border-black/[0.06] bg-fog/60 p-4 text-sm leading-relaxed text-graphite">
+          {narrative}
+        </div>
+      )}
 
+      {/* Lane 1: Observed Facts */}
       {facts.length > 0 && (
-        <Lane title="Observed" hint="What the data shows">
-          <ul className="flex flex-col gap-2">
-            {facts.map((f, i) => {
-              // Fact.text from the backend already narrates the number in
-              // context (currency, percent, an "N/100" score, or otherwise)
-              // -- only append a standalone value badge when the text
-              // doesn't already spell it out, to avoid misrendering e.g. a
-              // 0.12 rate as "₹0", or (the bug this guarded against)
-              // "Overall financial health score is 21/100." gaining a bogus
-              // "₹21". Deliberately NOT matching a bare "score" mention --
-              // that would also suppress the badge for e.g. "Your credit
-              // score trend is improving" (value: 750), which never spells
-              // out the number in the text.
-              const textAlreadyHasValue = /[₹%]|\d+\s*\/\s*\d+/.test(f.text);
-              return (
-                <li key={i} className="text-sm text-ink">
-                  {f.text}
-                  {f.value !== null && !textAlreadyHasValue ? (
-                    <span className="ml-2 font-medium">{formatCurrency(f.value)}</span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+        <Lane
+          title="Observed Facts"
+          hint="Grounded in your actual transactions"
+          badgeColor="bg-ink"
+          icon="✓"
+        >
+          <div className="rounded-surface border border-black/[0.08] bg-white p-4 shadow-sm">
+            <ul className="flex flex-col divide-y divide-black/[0.04]">
+              {facts.map((f, i) => {
+                const textAlreadyHasValue = /[₹%]|\d+\s*\/\s*\d+/.test(f.text);
+                return (
+                  <li key={i} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0 text-sm text-ink">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs text-pewter">•</span>
+                      <span>{f.text}</span>
+                    </div>
+                    {f.value !== null && !textAlreadyHasValue ? (
+                      <span className="font-semibold text-ink tnum shrink-0">
+                        {formatCurrency(f.value)}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </Lane>
       )}
 
+      {/* Lane 2: Predicted Modeling */}
       {predictions.length > 0 && (
-        <Lane title="Predicted" hint="Our best estimate, not a fact">
-          <ul className="flex flex-col gap-3">
-            {predictions.map((p, i) => (
-              <li key={i} className="flex flex-col gap-1 text-sm text-graphite">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span>{p.text}</span>
-                  <ConfidenceChip value={p.confidence} />
-                </div>
-                {(p.range_low !== null || p.range_high !== null) && (
-                  <span className="text-xs text-pewter">
-                    Likely range: {p.range_low !== null ? formatCurrency(p.range_low) : "?"} &ndash;{" "}
-                    {p.range_high !== null ? formatCurrency(p.range_high) : "?"}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+        <Lane
+          title="Model Predictions"
+          hint="Forward-looking cash flow and volatility estimates"
+          badgeColor="bg-indigo-600"
+          icon="↗"
+        >
+          <div className="rounded-surface border border-indigo-100 bg-indigo-50/20 p-4 shadow-sm">
+            <ul className="flex flex-col gap-3">
+              {predictions.map((p, i) => (
+                <li key={i} className="flex flex-col gap-1.5 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-ink">{p.text}</span>
+                    <ConfidenceChip value={p.confidence} />
+                  </div>
+                  {(p.range_low !== null || p.range_high !== null) && (
+                    <div className="inline-flex items-center gap-1.5 text-xs text-graphite">
+                      <span className="text-pewter">Confidence interval:</span>
+                      <span className="tnum font-medium text-ink bg-white px-2 py-0.5 rounded border border-black/[0.06]">
+                        {p.range_low !== null ? formatCurrency(p.range_low) : "?"} &ndash;{" "}
+                        {p.range_high !== null ? formatCurrency(p.range_high) : "?"}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </Lane>
       )}
 
+      {/* Lane 3: Recommended Actions */}
       {recommendations.length > 0 && (
-        <Lane title="Recommended" hint="Suggested action, with expected impact">
-          <ul className="flex flex-col gap-4">
+        <Lane
+          title="Recommended Actions"
+          hint="Simulated impact on your net worth and health score"
+          badgeColor="bg-ember"
+          icon="✦"
+        >
+          <div className="flex flex-col gap-3.5">
             {recommendations.map((r, i) => (
-              <li key={i} className="rounded-chip border border-mist p-4">
+              <div
+                key={i}
+                className="rounded-surface border border-ember/25 bg-gradient-to-b from-white to-orange-50/25 p-4 shadow-[0_2px_12px_rgba(255,89,0,0.04)]"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-ink">{r.text}</p>
+                  <p className="text-sm font-bold text-ink flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-ember shrink-0" />
+                    <span>{r.text}</span>
+                  </p>
                   <ConfidenceChip value={r.confidence} />
                 </div>
-                <p className="mt-1 text-xs text-graphite">{r.rationale}</p>
-                <div className="mt-3 flex items-center gap-2 text-sm">
-                  <span className="text-pewter">{r.impact.metric}:</span>
-                  <span className="text-graphite">{formatImpactValue(r.impact.metric, r.impact.before)}</span>
-                  <span className="text-mist">&rarr;</span>
-                  <span className="font-semibold text-ink">
-                    {formatImpactValue(r.impact.metric, r.impact.after)}
-                  </span>
-                  <span
-                    className={
-                      r.impact.delta >= 0
-                        ? "font-semibold text-ember-dark"
-                        : "font-semibold text-ink"
-                    }
-                  >
-                    ({r.impact.delta >= 0 ? "+" : ""}
-                    {formatImpactValue(r.impact.metric, r.impact.delta)})
-                  </span>
-                  <Chip tone="outline" className="ml-auto">
-                    {r.impact.horizon}
-                  </Chip>
+
+                <p className="mt-1 text-xs text-graphite pl-3.5">{r.rationale}</p>
+
+                {/* Before vs After Impact Visual Pill */}
+                <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-black/[0.06] text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-pewter">{r.impact.metric}:</span>
+                    <span className="text-graphite line-through tnum">
+                      {formatImpactValue(r.impact.metric, r.impact.before)}
+                    </span>
+                    <span className="text-pewter">→</span>
+                    <span className="font-bold text-ink tnum">
+                      {formatImpactValue(r.impact.metric, r.impact.after)}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-bold tnum px-1.5 py-0.5 rounded",
+                        r.impact.delta >= 0
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700"
+                      )}
+                    >
+                      ({r.impact.delta >= 0 ? "+" : ""}
+                      {formatImpactValue(r.impact.metric, r.impact.delta)})
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Chip tone="outline" className="text-[10px]">
+                      Horizon: {r.impact.horizon}
+                    </Chip>
+                    <Link
+                      href="/simulate"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-ember hover:underline"
+                    >
+                      Simulate Decision →
+                    </Link>
+                  </div>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </Lane>
       )}
 
+      {/* Data Gaps Section */}
       {data_gaps.length > 0 && (
-        <div className="rounded-chip border border-dashed border-mist bg-fog/60 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pewter">
-            What we don&apos;t know yet
+        <div className="rounded-surface border border-dashed border-black/[0.12] bg-fog/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-pewter flex items-center gap-1.5">
+            <span>ℹ</span>
+            <span>Identified Data Gaps & Model Caveats</span>
           </p>
-          <ul className="mt-2 flex flex-col gap-1">
+          <ul className="mt-2.5 flex flex-col gap-1.5">
             {data_gaps.map((g, i) => (
               <li key={i} className="text-xs text-graphite">
-                {g.text}
-                <span className="text-pewter"> &mdash; {g.what_would_help}</span>
+                <span className="font-medium text-ink">{g.text}</span>
+                <span className="text-pewter"> — {g.what_would_help}</span>
               </li>
             ))}
           </ul>
@@ -130,15 +180,35 @@ export function AnswerContractView({ answer }: { answer: AnswerContract }) {
   );
 }
 
-function Lane({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
-  const dot =
-    title === "Observed" ? "bg-ink" : title === "Predicted" ? "bg-graphite" : "bg-ember";
+function Lane({
+  title,
+  hint,
+  badgeColor,
+  icon,
+  children,
+}: {
+  title: string;
+  hint: string;
+  badgeColor: string;
+  icon: string;
+  children: ReactNode;
+}) {
   return (
-    <section>
-      <header className="mb-2 flex items-baseline gap-2">
-        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
-        <CardTitle className="uppercase tracking-wide text-xs text-pewter">{title}</CardTitle>
-        <span className="text-xs text-mist">{hint}</span>
+    <section className="flex flex-col gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-white font-bold",
+              badgeColor
+            )}
+            aria-hidden
+          >
+            {icon}
+          </span>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-ink">{title}</h4>
+        </div>
+        <span className="text-[11px] text-pewter">{hint}</span>
       </header>
       {children}
     </section>

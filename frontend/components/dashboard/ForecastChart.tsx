@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ComposedChart,
   Area,
@@ -11,12 +13,78 @@ import {
 } from "recharts";
 import type { CashFlowForecast } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-/**
- * P50 as the main Ember line, P10-P90 as a soft Mist band. When a second
- * forecast is provided (simulate "before" overlay), its P50 renders as a
- * dashed graphite line for comparison.
- */
+interface TooltipPayloadItem {
+  value?: number | [number, number];
+  dataKey?: string;
+  payload?: {
+    date: string;
+    band: [number, number];
+    p50: number;
+    comparePoint?: number | null;
+  };
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+  compareLabel?: string;
+}
+
+function CustomForecastTooltip({
+  active,
+  payload,
+  label,
+  compareLabel = "Baseline",
+}: CustomTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div className="rounded-chip border border-black/[0.1] bg-white/95 p-3.5 shadow-xl backdrop-blur-md text-xs flex flex-col gap-2 min-w-[200px]">
+      <div className="flex items-center justify-between border-b border-black/[0.06] pb-1.5">
+        <span className="font-semibold text-ink">{formatDate(data.date)}</span>
+        <span className="text-[10px] text-pewter uppercase font-medium">Trajectory</span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-1.5 text-graphite">
+            <span className="h-2 w-2 rounded-full bg-ember" />
+            <span>P50 Expected</span>
+          </span>
+          <span className="font-bold text-ink tnum">{formatCurrency(data.p50)}</span>
+        </div>
+
+        {data.band && (
+          <div className="flex items-center justify-between gap-3 text-pewter">
+            <span>P10 - P90 Band</span>
+            <span className="tnum font-medium text-graphite">
+              {formatCurrency(data.band[0])} - {formatCurrency(data.band[1])}
+            </span>
+          </div>
+        )}
+
+        {data.comparePoint !== null && data.comparePoint !== undefined && (
+          <div className="flex items-center justify-between gap-3 text-pewter pt-1 border-t border-black/[0.04]">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-graphite" />
+              <span>{compareLabel}</span>
+            </span>
+            <span className="tnum font-medium text-ink">
+              {formatCurrency(data.comparePoint)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ForecastChart({
   forecast,
   compareForecast,
@@ -28,47 +96,100 @@ export function ForecastChart({
 }) {
   const data = forecast.points.map((p, i) => ({
     date: p.date,
-    band: [p.p10, p.p90],
+    band: [p.p10, p.p90] as [number, number],
     p50: p.p50,
     comparePoint: compareForecast?.points[i]?.p50 ?? null,
   }));
 
+  const hasShortfall = Boolean(forecast.first_gap_date);
+  const confidencePercent = Math.round(
+    forecast.confidence <= 1
+      ? forecast.confidence * 100
+      : forecast.confidence
+  );
+
   return (
-    <div>
-      <div className="h-64">
+    <div className="flex flex-col gap-4">
+      {/* Forecast Telemetry Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-black/[0.04]">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border",
+              hasShortfall
+                ? "bg-rose-50 text-rose-700 border-rose-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+            )}
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                hasShortfall ? "bg-rose-500 animate-pulse" : "bg-emerald-500"
+              )}
+            />
+            {hasShortfall
+              ? `Deficit projected around ${formatDate(forecast.first_gap_date!)}`
+              : "No Cash Shortfall Projected (90 Days)"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-pewter">Forecast Confidence:</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-fog border border-black/[0.06] font-semibold text-ink tnum">
+            {confidencePercent}%
+          </span>
+        </div>
+      </div>
+
+      {/* Chart Canvas */}
+      <div className="h-72 w-full pt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ left: 8, right: 16, top: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-fog)" />
+          <ComposedChart data={data} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
+            <defs>
+              <linearGradient id="emberForecastGlow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ff5900" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#ff5900" stopOpacity={0.0} />
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
+
             <XAxis
               dataKey="date"
               tickFormatter={(d: string) => formatDate(d)}
               tick={{ fontSize: 11, fill: "var(--color-pewter)" }}
-              minTickGap={40}
+              axisLine={{ stroke: "rgba(15, 23, 42, 0.08)" }}
+              tickLine={false}
+              minTickGap={45}
             />
+
             <YAxis
               tickFormatter={(v: number) => formatCurrency(v)}
               tick={{ fontSize: 11, fill: "var(--color-pewter)" }}
-              width={80}
+              axisLine={false}
+              tickLine={false}
+              width={82}
             />
-            <Tooltip
-              labelFormatter={(d) => formatDate(String(d))}
-              formatter={(value, name) => {
-                if (name === "band" && Array.isArray(value)) {
-                  return [`${formatCurrency(Number(value[0]))} - ${formatCurrency(Number(value[1]))}`, "P10-P90 range"];
-                }
-                if (name === "p50") return [formatCurrency(Number(value)), "P50 (expected)"];
-                if (name === "comparePoint") return [formatCurrency(Number(value)), compareLabel];
-                return [String(value), String(name)];
-              }}
-              contentStyle={{ borderRadius: 6, borderColor: "var(--color-mist)", fontSize: 12 }}
-            />
+
+            <Tooltip content={<CustomForecastTooltip compareLabel={compareLabel} />} />
+
+            {/* P10 - P90 Soft Confidence Band */}
             <Area
               dataKey="band"
               stroke="none"
-              fill="var(--color-mist)"
-              fillOpacity={0.35}
+              fill="rgba(15, 23, 42, 0.06)"
               isAnimationActive={false}
             />
+
+            {/* Area glow under the expected line */}
+            <Area
+              dataKey="p50"
+              stroke="none"
+              fill="url(#emberForecastGlow)"
+              isAnimationActive={false}
+            />
+
+            {/* Comparison line if simulation active */}
             {compareForecast && (
               <Line
                 type="monotone"
@@ -76,42 +197,62 @@ export function ForecastChart({
                 stroke="var(--color-graphite)"
                 strokeDasharray="4 4"
                 dot={false}
-                strokeWidth={1.5}
+                strokeWidth={2}
                 isAnimationActive={false}
               />
             )}
+
+            {/* P50 Main Line */}
             <Line
               type="monotone"
               dataKey="p50"
-              stroke="var(--color-ember)"
-              strokeWidth={2}
+              stroke="#ff5900"
+              strokeWidth={2.5}
               dot={false}
+              activeDot={{ r: 5, fill: "#ff5900", stroke: "#ffffff", strokeWidth: 2 }}
               isAnimationActive={false}
             />
+
+            {/* Gap shortfall alert line */}
             {forecast.first_gap_date && (
               <ReferenceLine
                 x={forecast.first_gap_date}
-                stroke="var(--color-ink)"
-                strokeDasharray="2 2"
+                stroke="#e11d48"
+                strokeDasharray="3 3"
+                strokeWidth={2}
                 label={{
-                  value: "Shortfall",
+                  value: "⚠️ Projected Gap",
                   position: "insideTopLeft",
                   fontSize: 11,
-                  fill: "var(--color-ink)",
+                  fill: "#e11d48",
+                  fontWeight: 600,
                 }}
               />
             )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      {forecast.first_gap_date ? (
-        <p className="mt-3 text-sm text-graphite">
-          Projected shortfall around{" "}
-          <span className="font-semibold text-ink">{formatDate(forecast.first_gap_date)}</span>.
-        </p>
-      ) : (
-        <p className="mt-3 text-sm text-graphite">No shortfall projected in this horizon.</p>
-      )}
+
+      {/* Legend & Guidance */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 text-xs text-pewter border-t border-black/[0.04]">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-4 bg-ember rounded-full" />
+            <span className="text-graphite font-medium">P50 Expected</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-4 bg-black/[0.08] rounded-sm" />
+            <span>P10–P90 Range</span>
+          </span>
+          {compareForecast && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-4 border-t-2 border-dashed border-graphite" />
+              <span>{compareLabel}</span>
+            </span>
+          )}
+        </div>
+        <span>Calculated from real transaction volatility</span>
+      </div>
     </div>
   );
 }

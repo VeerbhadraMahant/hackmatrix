@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -13,6 +14,12 @@ import { DebtsList } from "@/components/dashboard/DebtsList";
 import { AccountCards } from "@/components/dashboard/AccountCards";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { AnswerContractView } from "@/components/AnswerContractView";
+import {
+  StatTileSkeleton,
+  HealthScoreSkeleton,
+  ForecastChartSkeleton,
+  ListItemSkeleton,
+} from "@/components/ui/Skeleton";
 import { formatCurrency, formatPercent } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -21,18 +28,48 @@ export default function DashboardPage() {
   const { data, error, loading, reload } = useAsync(fetchDashboard, [userId]);
 
   if (loading && !data) {
-    return <p className="text-sm text-pewter">Loading your financial snapshot...</p>;
+    return (
+      <div className="flex flex-col gap-8 animate-pulse">
+        <div className="h-60 rounded-card elevation-card p-6">
+          <HealthScoreSkeleton />
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <StatTileSkeleton />
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <ForecastChartSkeleton />
+        </Card>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <ListItemSkeleton rows={3} />
+          </Card>
+          <Card>
+            <ListItemSkeleton rows={2} />
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <Card className="flex flex-col gap-3">
-        <p className="text-sm text-ink">Could not load the dashboard: {error}</p>
-        <p className="text-xs text-pewter">
-          Is the backend running at {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}?
-        </p>
-        <Button variant="secondary" size="sm" onClick={reload} className="self-start">
-          Retry
+      <Card className="flex flex-col gap-4 border-rose-200 bg-rose-50/20 max-w-xl mx-auto my-12 text-center items-center py-8">
+        <div className="h-10 w-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg">
+          !
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-ink">Could not load financial snapshot</h3>
+          <p className="text-xs text-graphite mt-1 max-w-md">{error}</p>
+          <p className="text-[11px] text-pewter mt-1">
+            Ensure backend server is running on {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={reload} className="mt-2">
+          Retry Fetching Snapshot
         </Button>
       </Card>
     );
@@ -41,51 +78,125 @@ export default function DashboardPage() {
   if (!data) return null;
 
   return (
-    <div className="flex flex-col gap-12">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="flex flex-col gap-8 pb-12"
+    >
+      {/* Top Banner: Financial Overview Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/[0.04]">
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-ink">
+            Financial Health Command Center
+          </h1>
+          <p className="text-xs sm:text-sm text-graphite mt-0.5">
+            Consolidated accounts, debt pressure, and 90-day cash-flow simulation for{" "}
+            <span className="font-semibold text-ink capitalize">
+              {userId.replace("demo-", "")}
+            </span>
+            .
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={reload} className="text-xs">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Data
+          </Button>
+        </div>
+      </div>
+
+      {/* Primary Bento Hero: Health Score Card */}
       <HealthScoreCard score={data.health_score} />
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        <Card>
-          <StatTile label="Net worth" value={formatCurrency(data.net_worth)} />
+      {/* KPI Stat Tiles Bento Bar */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Card hoverable className="p-5">
+          <StatTile
+            label="Net Worth"
+            value={formatCurrency(data.net_worth)}
+            sub="Liquid + Invested Assets"
+          />
         </Card>
-        <Card>
-          <StatTile label="Monthly income" value={formatCurrency(data.monthly_income)} />
+        <Card hoverable className="p-5">
+          <StatTile
+            label="Monthly Inflow"
+            value={formatCurrency(data.monthly_income)}
+            trend={{ direction: "up", text: "Stable", positive: true }}
+            sub="Verified Payroll"
+          />
         </Card>
-        <Card>
-          <StatTile label="Monthly expenses" value={formatCurrency(data.monthly_expenses)} />
+        <Card hoverable className="p-5">
+          <StatTile
+            label="Monthly Outflow"
+            value={formatCurrency(data.monthly_expenses)}
+            sub="Obligations & Living"
+          />
         </Card>
-        <Card>
-          <StatTile label="Savings rate" value={formatPercent(data.savings_rate)} />
+        <Card hoverable className="p-5">
+          <StatTile
+            label="Savings Rate"
+            value={formatPercent(data.savings_rate)}
+            trend={{
+              direction: data.savings_rate >= 0.2 ? "up" : "down",
+              text: data.savings_rate >= 0.2 ? "Target Met" : "Below 20%",
+              positive: data.savings_rate >= 0.2,
+            }}
+            sub="Post-tax surplus"
+          />
         </Card>
       </div>
 
-      <Card>
+      {/* Cash-Flow Forecast Section */}
+      <Card className="p-6 sm:p-7">
         <CardHeader>
-          <CardTitle>Cash-flow forecast</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>90-Day Cash-Flow Trajectory</CardTitle>
+            <span className="text-xs text-pewter font-normal hidden sm:inline">
+              (Bootstrap-resampled volatility bands)
+            </span>
+          </div>
         </CardHeader>
         <ForecastChart forecast={data.forecast} />
       </Card>
 
-      <Card>
+      {/* Net Worth Trend Section */}
+      <Card className="p-6 sm:p-7">
         <CardHeader>
-          <CardTitle>Net worth over time</CardTitle>
+          <CardTitle>Net Worth Over Time</CardTitle>
         </CardHeader>
         <NetWorthTrend userId={userId} />
       </Card>
 
+      {/* Account Balances Cards */}
       <AccountCards userId={userId} />
 
+      {/* Two-Column Grid: Recurring Commitments & Debts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RecurringList obligations={data.recurring_obligations} />
         <DebtsList debts={data.debts} />
       </div>
 
-      <Card>
+      {/* Three-Lane Insights Panel */}
+      <Card className="p-6 sm:p-8">
         <CardHeader>
-          <CardTitle>Insights</CardTitle>
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-ember text-white font-bold text-xs shadow-sm">
+              AI
+            </div>
+            <div>
+              <CardTitle>Autonomous Financial Insights & Guidance</CardTitle>
+              <p className="text-xs text-pewter mt-0.5">
+                Observed facts, forward-looking predictions, and high-impact actions
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <AnswerContractView answer={data.insights} />
       </Card>
-    </div>
+    </motion.div>
   );
 }

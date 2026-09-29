@@ -1,59 +1,195 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+"use client";
+
+import { motion } from "framer-motion";
 import type { HealthScore } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
+
+function getScoreTier(score: number): { label: string; color: string; bg: string; border: string } {
+  if (score >= 75) {
+    return {
+      label: "Optimal Health",
+      color: "text-emerald-700",
+      bg: "bg-emerald-50",
+      border: "border-emerald-200",
+    };
+  }
+  if (score >= 55) {
+    return {
+      label: "Moderate Stability",
+      color: "text-amber-700",
+      bg: "bg-amber-50",
+      border: "border-amber-200",
+    };
+  }
+  return {
+    label: "Attention Required",
+    color: "text-rose-700",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+  };
+}
 
 export function HealthScoreCard({ score }: { score: HealthScore }) {
+  const rounded = Math.round(score.overall);
+  const tier = getScoreTier(rounded);
   const trend = score.trend_30d;
   const trendUp = trend !== null && trend > 0;
   const trendDown = trend !== null && trend < 0;
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Health score</CardTitle>
-      </CardHeader>
-      <div className="flex flex-wrap items-end gap-6">
-        <div className="flex items-baseline gap-2">
-          <span className="font-display text-6xl text-ink leading-none">{Math.round(score.overall)}</span>
-          <span className="text-sm text-pewter">/ 100</span>
-        </div>
-        {trend !== null && (
-          <span
-            className={
-              "flex items-center gap-1 text-sm font-medium " +
-              (trendUp ? "text-ember-dark" : trendDown ? "text-graphite" : "text-pewter")
-            }
-          >
-            {trendUp ? "↑" : trendDown ? "↓" : "→"} {Math.abs(trend).toFixed(1)} pts / 30d
-          </span>
-        )}
-      </div>
+  // Arc calculation for SVG circular meter
+  const radius = 58;
+  const circumference = 2 * Math.PI * radius;
+  // Use a 270 degree arc for a gauge look
+  const strokeDashoffset = circumference - (rounded / 100) * circumference * 0.75;
 
-      <div className="mt-6 h-48">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={score.sub_scores} layout="vertical" margin={{ left: 8, right: 16 }}>
-            <CartesianGrid horizontal={false} stroke="var(--color-fog)" />
-            <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--color-pewter)" }} />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={110}
-              tick={{ fontSize: 11, fill: "var(--color-graphite)" }}
-            />
-            <Tooltip
-              formatter={(value, _name, item) => [
-                `${Math.round(Number(value))} / 100`,
-                (item?.payload as { detail?: string } | undefined)?.detail ?? "",
-              ]}
-              contentStyle={{ borderRadius: 6, borderColor: "var(--color-mist)", fontSize: 12 }}
-            />
-            <Bar dataKey="score" radius={[0, 4, 4, 0]} maxBarSize={16}>
-              {score.sub_scores.map((s, i) => (
-                <Cell key={i} fill={s.score >= 60 ? "var(--color-ink)" : "var(--color-ember)"} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+  return (
+    <Card className="relative overflow-hidden">
+      {/* Background ambient corner glow */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-ember-soft/30 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CardTitle>Financial Health Index</CardTitle>
+          <span
+            className={cn(
+              "px-2.5 py-0.5 rounded-full text-xs font-semibold border",
+              tier.bg,
+              tier.color,
+              tier.border
+            )}
+          >
+            {tier.label}
+          </span>
+        </div>
+        <span className="text-xs text-pewter">Weighted 5-Pillar Model</span>
+      </CardHeader>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2 pb-4">
+        {/* Left Column: Radial Gauge + Trend */}
+        <div className="lg:col-span-4 flex flex-col items-center justify-center p-4 rounded-surface bg-fog/60 border border-black/[0.04]">
+          <div className="relative flex items-center justify-center w-44 h-44">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
+              {/* Background circle */}
+              <circle
+                cx="70"
+                cy="70"
+                r={radius}
+                className="stroke-black/[0.07]"
+                strokeWidth="10"
+                fill="transparent"
+                strokeDasharray={`${circumference * 0.75} ${circumference * 0.25}`}
+                strokeLinecap="round"
+              />
+              {/* Animated Progress arc */}
+              <motion.circle
+                cx="70"
+                cy="70"
+                r={radius}
+                className={cn(
+                  rounded >= 75
+                    ? "stroke-emerald-500"
+                    : rounded >= 55
+                    ? "stroke-amber-500"
+                    : "stroke-ember"
+                )}
+                strokeWidth="10"
+                fill="transparent"
+                strokeDasharray={circumference}
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                strokeLinecap="round"
+              />
+            </svg>
+
+            {/* Score inside circular gauge */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span className="font-display text-5xl font-semibold text-ink leading-none tnum">
+                {rounded}
+              </span>
+              <span className="text-xs font-medium text-pewter mt-1">out of 100</span>
+            </div>
+          </div>
+
+          {/* 30-Day Trend Badge */}
+          {trend !== null && (
+            <div
+              className={cn(
+                "mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border",
+                trendUp
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : trendDown
+                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                  : "bg-fog text-graphite border-black/[0.08]"
+              )}
+            >
+              <span>{trendUp ? "↑" : trendDown ? "↓" : "→"}</span>
+              <span>
+                {Math.abs(trend).toFixed(1)} pts {trendUp ? "gain" : trendDown ? "drop" : ""} over 30d
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: 5 Sub-Score Breakdown Bars */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="flex items-center justify-between text-xs text-pewter font-medium px-1">
+            <span>Health Sub-Category</span>
+            <span>Weight & Score</span>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {score.sub_scores.map((sub, i) => {
+              const subRounded = Math.round(sub.score);
+              const isStrong = subRounded >= 70;
+              const isModerate = subRounded >= 50 && subRounded < 70;
+
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col gap-1.5 p-3 rounded-chip border border-black/[0.04] bg-white hover:bg-fog/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-ink">{sub.name}</span>
+                      <span className="text-[10px] text-pewter font-medium bg-fog px-1.5 py-0.5 rounded border border-black/[0.04]">
+                        Weight: {Math.round(sub.weight * 100)}%
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold text-ink tnum">{subRounded}</span>
+                      <span className="text-[11px] text-pewter">/100</span>
+                    </div>
+                  </div>
+
+                  {/* Visual Progress Bar */}
+                  <div className="w-full bg-fog rounded-full h-2 overflow-hidden">
+                    <motion.div
+                      className={cn(
+                        "h-full rounded-full",
+                        isStrong
+                          ? "bg-emerald-500"
+                          : isModerate
+                          ? "bg-amber-500"
+                          : "bg-ember"
+                      )}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${subRounded}%` }}
+                      transition={{ duration: 0.8, delay: 0.1 * i, ease: "easeOut" }}
+                    />
+                  </div>
+
+                  {sub.detail && (
+                    <span className="text-[11px] text-graphite line-clamp-1 mt-0.5">
+                      {sub.detail}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Card>
   );

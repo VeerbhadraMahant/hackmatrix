@@ -1,35 +1,66 @@
 @import "tailwindcss";
 
 /*
- * FinPilot design tokens -- derived from the Refero "Brex" style:
- * white-concrete canvas, monochrome ink scale, single Ember accent used for
- * exactly one primary action per region. See plan doc for full rationale.
+ * FinPilot Design System — Refined Fintech Direction
+ * Inspired by Copilot Money, Monarch Money, Rocket Money & YNAB.
+ * Retains the Paper + Ink + Ember core palette while adding tactile elevation,
+ * glassmorphism, tabular numerals, and motion primitives.
  */
+
 :root {
+  /* Canvas & Surfaces */
   --color-paper: #ffffff;
-  --color-fog: #f3f3f7;
-  --color-mist: #b9bbc6;
-  --color-steel: #8b8d98;
-  --color-pewter: #6f737b;
-  --color-graphite: #60646c;
-  --color-ink: #000000;
-  --color-carbon: #15191e;
-  --color-abyss: #000710;
+  --color-fog: #f8f9fa;
+  --color-surface-subtle: #fafbfc;
+  --color-surface-card: #ffffff;
+  --color-surface-glass: rgba(255, 255, 255, 0.82);
+  --color-surface-glass-dark: rgba(9, 10, 15, 0.85);
+
+  /* Monochrome Ink & Metal Scale */
+  --color-ink: #090a0f;
+  --color-carbon: #181a20;
+  --color-graphite: #4b5162;
+  --color-pewter: #717786;
+  --color-steel: #9aa0b0;
+  --color-mist: #d9dce5;
+
+  /* Core Accent (Luminous Ember) */
   --color-ember: #ff5900;
   --color-ember-dark: #d84900;
+  --color-ember-light: #ff7629;
+  --color-ember-glow: rgba(255, 89, 0, 0.18);
+  --color-ember-soft: rgba(255, 89, 0, 0.08);
 
-  /* semantic */
+  /* Semantic Category / Telemetry Badges */
+  --badge-emerald: #059669;
+  --badge-emerald-bg: rgba(5, 150, 105, 0.09);
+  --badge-amber: #d97706;
+  --badge-amber-bg: rgba(217, 119, 6, 0.09);
+  --badge-rose: #e11d48;
+  --badge-rose-bg: rgba(225, 29, 72, 0.09);
+  --badge-indigo: #4f46e5;
+  --badge-indigo-bg: rgba(79, 70, 229, 0.09);
+  --badge-cyan: #0891b2;
+  --badge-cyan-bg: rgba(8, 145, 178, 0.09);
+
+  /* Borders & Hairlines */
+  --border-hairline: rgba(15, 23, 42, 0.08);
+  --border-hairline-subtle: rgba(15, 23, 42, 0.04);
+  --border-highlight: rgba(255, 255, 255, 0.9);
+  --border-focus: rgba(255, 89, 0, 0.45);
+
+  /* Semantic Aliases */
   --background: var(--color-paper);
   --foreground: var(--color-ink);
   --surface-muted: var(--color-fog);
-  --border-hairline: var(--color-mist);
   --text-secondary: var(--color-graphite);
   --text-tertiary: var(--color-pewter);
   --accent: var(--color-ember);
-  --accent-foreground: var(--color-paper);
+  --accent-foreground: #ffffff;
 
-  --radius-chip: 6px;
-  --radius-surface: 12px;
+  --radius-chip: 8px;
+  --radius-surface: 16px;
+  --radius-card: 20px;
 
   /* Shared motion + stacking scale -- additive only, keeps interactive
      transitions (buttons, chips, form controls) consistent across pages
@@ -50,60 +81,182 @@
   --color-foreground: var(--foreground);
   --color-paper: var(--color-paper);
   --color-fog: var(--color-fog);
+  --color-surface-subtle: var(--color-surface-subtle);
   --color-mist: var(--color-mist);
   --color-steel: var(--color-steel);
   --color-pewter: var(--color-pewter);
   --color-graphite: var(--color-graphite);
-  --color-ink: var(--color-ink);
   --color-carbon: var(--color-carbon);
-  --color-abyss: var(--color-abyss);
+  --color-ink: var(--color-ink);
   --color-ember: var(--color-ember);
   --color-ember-dark: var(--color-ember-dark);
+  --color-ember-light: var(--color-ember-light);
+  --color-ember-soft: var(--color-ember-soft);
   --color-surface-muted: var(--surface-muted);
   --color-border-hairline: var(--border-hairline);
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+
+  --color-emerald-badge: var(--badge-emerald);
+  --color-amber-badge: var(--badge-amber);
+  --color-rose-badge: var(--badge-rose);
+  --color-indigo-badge: var(--badge-indigo);
+  --color-cyan-badge: var(--badge-cyan);
+
   --radius-chip: var(--radius-chip);
   --radius-surface: var(--radius-surface);
+  --radius-card: var(--radius-card);
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-display);
 }
 
-/* Financial-health lane colors (Observed / Predicted / Recommended) -- kept
-   monochrome + ember per the "single accent" rule; lanes are distinguished
-   by icon + label + hairline, never by introducing a second hue. */
-:root {
-  --lane-observed: var(--color-ink);
-  --lane-predicted: var(--color-graphite);
-  --lane-recommended: var(--color-ember);
-}
-
+/* Base resets & typography */
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Inter, Arial, Helvetica, sans-serif;
-  letter-spacing: -0.01em;
+  font-family: var(--font-sans), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.012em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4 {
-  font-family: var(--font-sans), Inter, sans-serif;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.025em;
 }
 
 .font-display {
-  font-family: var(--font-display), "Fraunces", serif;
+  font-family: var(--font-display), "Fraunces", Georgia, serif;
 }
 
-/* No drop shadows for elevation, per the Brex rule -- surfaces are defined
-   by paper-on-fog contrast and 1px hairline borders. Reserved for floating
-   UI only (modals, toasts). */
-.shadow-float {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+/* Tabular Numerals for stable, non-jumping financial counters */
+.tnum,
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Multi-tier Tactile Elevation Shadows */
+.elevation-card {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--border-hairline);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 6px 20px -3px rgba(15, 23, 42, 0.05);
+}
+
+.elevation-card-hover {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 220ms ease;
+}
+
+.elevation-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.05),
+    0 16px 36px -4px rgba(15, 23, 42, 0.08);
+}
+
+.elevation-card-active {
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.04),
+    0 12px 30px -4px rgba(255, 89, 0, 0.08);
+}
+
+/* Frosted Glass Utilities */
+.glass-header {
+  background-color: var(--color-surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.glass-card {
+  background-color: var(--color-surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 20px -2px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Inner highlight for premium feel */
+.inner-highlight {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
+}
+
+/* Subtle Shimmer effect for Loading Skeletons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-mask {
+  position: relative;
+  overflow: hidden;
+  background-color: #f1f2f5;
+}
+
+.shimmer-mask::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite ease-in-out;
+}
+
+/* Floating Drift Keyframes for Hero Visual */
+@keyframes drift-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.4deg);
+  }
+}
+
+@keyframes drift-delayed {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-0.5deg);
+  }
+}
+
+.animate-drift-slow {
+  animation: drift-slow 10s ease-in-out infinite;
+}
+
+.animate-drift-delayed {
+  animation: drift-delayed 12s ease-in-out infinite 1.5s;
+}
+
+/* Prefers Reduced Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Skeleton loading placeholder -- see components/ui/Skeleton.tsx. */
