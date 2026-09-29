@@ -313,3 +313,59 @@ class ChatMessage(BaseModel):
     content: str
     answer: Optional[AnswerContract] = None
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Transactions ledger + budgets (added by ledger-budgets-backend-agent).
+# Additive only -- does not alter any existing contract above.
+# ---------------------------------------------------------------------------
+
+
+class TransactionPage(BaseModel):
+    """Paginated response for GET /api/transactions/{user_id}."""
+
+    items: list[Transaction]
+    total: int
+    page: int
+    page_size: int
+
+
+class TransactionUpdate(BaseModel):
+    """Body for PATCH /api/transactions/{user_id}/{transaction_id}. Both
+    fields optional -- only the fields provided are updated (manual
+    recategorization / merchant correction)."""
+
+    category: Optional[TxnCategory] = None
+    merchant: Optional[str] = None
+
+
+class Budget(BaseModel):
+    """Mirrors models.BudgetRow."""
+
+    id: str
+    user_id: str
+    category: TxnCategory
+    monthly_limit: float
+
+
+class BudgetCreateRequest(BaseModel):
+    category: TxnCategory
+    monthly_limit: float
+
+
+BudgetHealth = Literal["under", "near", "over"]
+
+
+class BudgetStatus(BaseModel):
+    category: TxnCategory
+    monthly_limit: float
+    spent_so_far: float
+    remaining: float
+    percent_used: float
+    status: BudgetHealth
+
+
+class SafeToSpend(BaseModel):
+    amount: float
+    basis: str  # human-readable explanation of the formula/data used
+    as_of_date: date
