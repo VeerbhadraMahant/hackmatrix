@@ -106,6 +106,19 @@ class InsightsSnapshotRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class BudgetRow(SQLModel, table=True):
+    """User-defined monthly spending limit per category (added by
+    ledger-budgets-backend-agent). Additive -- does not alter any existing
+    table/class in this file."""
+
+    __tablename__ = "budgets"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    user_id: str = Field(index=True)
+    category: str
+    monthly_limit: float
+
+
 class AuditLogRow(SQLModel, table=True):
     """Security audit trail: every authentication denial (401/403/429) and
     every successful data-mutating request. `user_id` is nullable because a
