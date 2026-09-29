@@ -49,11 +49,11 @@ export function HealthScoreCard({ score }: { score: HealthScore }) {
       <div className="absolute top-0 right-0 w-64 h-64 bg-ember-soft/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
       <CardHeader>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CardTitle>Financial Health Index</CardTitle>
           <span
             className={cn(
-              "px-2.5 py-0.5 rounded-full text-xs font-semibold border",
+              "px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap",
               tier.bg,
               tier.color,
               tier.border

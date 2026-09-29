@@ -211,7 +211,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 pb-16">
+    <div className="flex flex-col gap-8 pb-16 min-w-0 max-w-full">
       {/* Editorial Fraunces Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/[0.04]">
         <div>
@@ -288,7 +288,7 @@ export default function TransactionsPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={category}
               onChange={(e) => {
@@ -314,7 +314,7 @@ export default function TransactionsPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-graphite">
               <span className="text-pewter font-medium">From:</span>
               <input
@@ -376,9 +376,9 @@ export default function TransactionsPage() {
       )}
 
       {/* Main Ledger Table Card */}
-      <Card className="p-0 sm:p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
+      <Card className="p-0 sm:p-0 overflow-hidden max-w-full">
+        <div className="overflow-x-auto w-full max-w-full">
+          <table className="w-full min-w-[620px] text-left text-sm border-collapse">
             <thead>
               <tr className="border-b border-black/[0.06] bg-fog/75 text-xs font-semibold uppercase tracking-wider text-pewter select-none">
                 <SortableHeader

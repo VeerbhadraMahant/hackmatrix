@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
 import { NotificationBell } from "@/components/NotificationBell";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, setUserId } from "@/lib/user";
 
@@ -86,7 +87,7 @@ export function NavShell({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background overflow-x-hidden">
       <header className="sticky top-0 z-50 glass-header">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-3 sm:px-8">
           {/* Logo & Brand */}
@@ -206,9 +207,12 @@ export function NavShell({ children }: { children: ReactNode }) {
         </AnimatePresence>
       </header>
 
-      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 sm:px-8 sm:py-10">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 pt-4 pb-28 sm:px-8 sm:py-10 md:pb-10 min-w-0">
         {children}
       </main>
+
+      {/* Ergonomic Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 }
