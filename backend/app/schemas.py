@@ -458,3 +458,77 @@ class NotificationItem(BaseModel):
     text: str
     date: date
     source_ref: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Indian Income Tax Regime & Deductions Optimizer
+# ---------------------------------------------------------------------------
+
+
+class TaxSlabBreakdown(BaseModel):
+    slab_label: str
+    rate_pct: float
+    taxable_amount_in_slab: float
+    tax_amount: float
+
+
+class TaxDeductionsBreakdown(BaseModel):
+    standard_deduction: float
+    section_80c: float
+    section_80c_limit: float = 150000.0
+    section_80d: float
+    section_80d_limit: float = 75000.0
+    section_80ccd_1b_nps: float
+    section_80ccd_1b_limit: float = 50000.0
+    section_24b_home_loan_interest: float
+    section_24b_limit: float = 200000.0
+    hra_exemption: float = 0.0
+    other_deductions: float = 0.0
+    total_deductions: float
+
+
+class TaxRegimeCalculation(BaseModel):
+    regime: Literal["new", "old"]
+    gross_income: float
+    total_deductions: float
+    taxable_income: float
+    slabs: list[TaxSlabBreakdown]
+    tax_before_rebate: float
+    rebate_87a: float
+    tax_after_rebate: float
+    cess_4pct: float
+    net_tax_payable: float
+    effective_tax_rate_pct: float
+    monthly_take_home: float
+    deductions_applied: TaxDeductionsBreakdown
+
+
+class DetectedDeductions(BaseModel):
+    section_80c_detected: float
+    section_80d_detected: float
+    home_loan_interest_detected: float
+    rent_paid_detected: float
+
+
+class TaxOptimizationAnalysis(BaseModel):
+    user_id: str
+    gross_annual_income: float
+    new_regime: TaxRegimeCalculation
+    old_regime: TaxRegimeCalculation
+    recommended_regime: Literal["new", "old"]
+    annual_tax_savings: float
+    monthly_take_home_delta: float
+    recommendation_rationale: str
+    break_even_deductions_needed: float
+    detected_deductions: DetectedDeductions
+
+
+class TaxCalculationRequest(BaseModel):
+    gross_annual_income: Optional[float] = None
+    section_80c: Optional[float] = None
+    section_80d: Optional[float] = None
+    section_80ccd_1b_nps: Optional[float] = None
+    section_24b_home_loan: Optional[float] = None
+    hra_exemption: Optional[float] = None
+    other_deductions: Optional[float] = None
+

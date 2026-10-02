@@ -18,6 +18,7 @@ const LINKS = [
   { href: "/goals", label: "Goals" },
   { href: "/copilot", label: "Copilot" },
   { href: "/simulate", label: "Simulate" },
+  { href: "/tax", label: "Tax" },
   { href: "/timeline", label: "Timeline" },
   { href: "/statement", label: "Statement" },
   { href: "/security", label: "Security" },

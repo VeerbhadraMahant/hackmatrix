@@ -15,6 +15,8 @@ import type {
   SafeToSpend,
   SimulationRequest,
   SimulationResult,
+  TaxCalculationRequest,
+  TaxOptimizationAnalysis,
   Transaction,
   TransactionFilters,
   TransactionPage,
@@ -160,4 +162,12 @@ export const api = {
 
   // Notifications
   notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),
+
+  // Tax Optimizer
+  taxAnalysis: (userId: string) => apiFetch<TaxOptimizationAnalysis>(`/api/tax/${userId}/analysis`),
+  calculateTax: (userId: string, req: TaxCalculationRequest) =>
+    apiFetch<TaxOptimizationAnalysis>(`/api/tax/${userId}/calculate`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
 };

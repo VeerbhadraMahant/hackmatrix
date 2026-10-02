@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FileText, Plus, Wallet } from "lucide-react";
+import { Calculator, FileText, Plus, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { isDemoUserId } from "@/lib/user";
@@ -139,6 +139,17 @@ export default function DashboardPage() {
             </svg>
             Refresh Data
           </Button>
+
+          <Link href="/tax">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="text-xs font-semibold gap-1.5 shadow-xs border-mist hover:border-black/20"
+            >
+              <Calculator className="w-3.5 h-3.5 text-ember" />
+              <span>Tax Optimizer</span>
+            </Button>
+          </Link>
 
           <Link href="/statement">
             <Button

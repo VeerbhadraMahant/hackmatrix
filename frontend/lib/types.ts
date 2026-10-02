@@ -311,3 +311,76 @@ export interface NotificationItem {
   date: string;
   source_ref: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Indian Income Tax Regime & Deductions Optimizer
+// ---------------------------------------------------------------------------
+
+export interface TaxSlabBreakdown {
+  slab_label: string;
+  rate_pct: number;
+  taxable_amount_in_slab: number;
+  tax_amount: number;
+}
+
+export interface TaxDeductionsBreakdown {
+  standard_deduction: number;
+  section_80c: number;
+  section_80c_limit: number;
+  section_80d: number;
+  section_80d_limit: number;
+  section_80ccd_1b_nps: number;
+  section_80ccd_1b_limit: number;
+  section_24b_home_loan_interest: number;
+  section_24b_limit: number;
+  hra_exemption: number;
+  other_deductions: number;
+  total_deductions: number;
+}
+
+export interface TaxRegimeCalculation {
+  regime: "new" | "old";
+  gross_income: number;
+  total_deductions: number;
+  taxable_income: number;
+  slabs: TaxSlabBreakdown[];
+  tax_before_rebate: number;
+  rebate_87a: number;
+  tax_after_rebate: number;
+  cess_4pct: number;
+  net_tax_payable: number;
+  effective_tax_rate_pct: number;
+  monthly_take_home: number;
+  deductions_applied: TaxDeductionsBreakdown;
+}
+
+export interface DetectedDeductions {
+  section_80c_detected: number;
+  section_80d_detected: number;
+  home_loan_interest_detected: number;
+  rent_paid_detected: number;
+}
+
+export interface TaxOptimizationAnalysis {
+  user_id: string;
+  gross_annual_income: number;
+  new_regime: TaxRegimeCalculation;
+  old_regime: TaxRegimeCalculation;
+  recommended_regime: "new" | "old";
+  annual_tax_savings: number;
+  monthly_take_home_delta: number;
+  recommendation_rationale: string;
+  break_even_deductions_needed: number;
+  detected_deductions: DetectedDeductions;
+}
+
+export interface TaxCalculationRequest {
+  gross_annual_income?: number | null;
+  section_80c?: number | null;
+  section_80d?: number | null;
+  section_80ccd_1b_nps?: number | null;
+  section_24b_home_loan?: number | null;
+  hra_exemption?: number | null;
+  other_deductions?: number | null;
+}
+

@@ -100,6 +100,13 @@ Inspired by *Copilot Money*, *Monarch Money*, and *Brex*:
 - **Typography**: Editorial `Fraunces` serif headings paired with clean `Inter` and tabular numerals (`.tnum`) for non-jumping financial counters.
 - **Micro-Interactions**: Framer Motion spring physics, magnetic pill sliders, and tactile haptic scaling on tap.
 
+### 7. Indian Income Tax Regime & Deductions Optimizer (Section 115BAC vs. Old Regime)
+A specialized direct-tax intelligence engine tailored to Indian retail taxpayers:
+- **Regime Comparison**: Side-by-side computation of Section 115BAC (New Regime, ₹75,000 standard deduction, revised slabs, Section 87A rebate & marginal relief) versus the Old Tax Regime.
+- **Automated Deduction Recovery**: Automatically analyzes banking feeds to recover eligible deductions across Section 80C (ELSS / mutual fund SIPs, EPF), Section 80D (health insurance), Section 24(b) (home loan interest), and HRA.
+- **Interactive What-If Sandbox**: Real-time counterfactual calculation allowing users to simulate additional investments in Section 80C, 80D, or Section 80CCD(1B) NPS with dynamic break-even threshold analysis.
+- **1-Click Simulator Integration**: Deep-links tax-saving opportunities directly into the What-If Simulator.
+
 ---
 
 ## 🏛️ Interactive System Architecture
@@ -254,6 +261,7 @@ hackmatrix/
 │   │   │   ├── goals/       # Target milestones with 25/50/75/100% progress ticks
 │   │   │   ├── copilot/     # AI chat with prompt chips and 3-lane answer contracts
 │   │   │   ├── simulate/    # What-if scenario sandbox with query param deep linking
+│   │   │   ├── tax/         # Indian Income Tax Regime & Deductions Optimizer (New vs Old)
 │   │   │   ├── statement/   # Executive Monthly Health Report (Print / PDF View)
 │   │   │   ├── timeline/    # Recompute diff visualizer
 │   │   │   └── security/    # MFA enrollment, audit logs, offline privacy toggle
