@@ -27,6 +27,7 @@ __pycache__/
 *.sqlite3
 
 # claude / docs (keep only the repo-root README.md)
+.agents/
 .claude/
 CLAUDE.md
 AGENTS.md
