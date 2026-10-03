@@ -80,6 +80,19 @@ class Account(BaseModel):
     currency: str = "INR"
 
 
+class ReviewStatus(str, Enum):
+    pending = "pending"
+    reviewed = "reviewed"
+    skipped = "skipped"
+
+
+class RuleMatchType(str, Enum):
+    contains = "contains"
+    exact = "exact"
+    starts_with = "starts_with"
+    regex = "regex"
+
+
 class Transaction(BaseModel):
     id: str
     user_id: str
@@ -91,6 +104,10 @@ class Transaction(BaseModel):
     description: Optional[str] = None
     is_recurring: bool = False
     recurring_group_id: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    review_status: str = "pending"
+    reviewed_at: Optional[datetime] = None
 
 
 class Debt(BaseModel):
@@ -354,12 +371,57 @@ class TransactionPage(BaseModel):
 
 
 class TransactionUpdate(BaseModel):
-    """Body for PATCH /api/transactions/{user_id}/{transaction_id}. Both
-    fields optional -- only the fields provided are updated (manual
-    recategorization / merchant correction)."""
+    """Body for PATCH /api/transactions/{user_id}/{transaction_id}.
+    All fields optional -- only the fields provided are updated."""
 
     category: Optional[TxnCategory] = None
     merchant: Optional[str] = None
+    tags: Optional[list[str]] = None
+    notes: Optional[str] = None
+    review_status: Optional[str] = None
+
+
+class ReviewQueueResponse(BaseModel):
+    pending_count: int
+    items: list[Transaction]
+
+
+class ReviewAction(str, Enum):
+    confirm = "confirm"
+    recategorize = "recategorize"
+    skip = "skip"
+
+
+class ReviewTransactionRequest(BaseModel):
+    action: ReviewAction
+    category: Optional[TxnCategory] = None
+    tags: Optional[list[str]] = None
+    notes: Optional[str] = None
+    create_rule: bool = False
+    rule_pattern: Optional[str] = None
+
+
+class CategorizationRule(BaseModel):
+    id: str
+    user_id: str
+    match_type: RuleMatchType = RuleMatchType.contains
+    pattern: str
+    category: TxnCategory
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime
+
+
+class CategorizationRuleCreate(BaseModel):
+    match_type: RuleMatchType = RuleMatchType.contains
+    pattern: str
+    category: TxnCategory
+    tags: list[str] = Field(default_factory=list)
+    apply_to_existing: bool = False
+
+
+class CategorizationRuleList(BaseModel):
+    items: list[CategorizationRule]
+    total: int
 
 
 class Budget(BaseModel):

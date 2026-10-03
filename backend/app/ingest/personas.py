@@ -16,13 +16,14 @@ Two entry points:
 from __future__ import annotations
 
 import random
+import json
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-from app.models import AccountRow, DebtRow, IncomeRow, TransactionRow
+from app.models import AccountRow, CategorizationRuleRow, DebtRow, IncomeRow, TransactionRow
 from app.schemas import RecurrenceFrequency, TxnCategory
 
 MONTHS_OF_HISTORY = 12
@@ -103,6 +104,7 @@ class PersonaData:
     transactions: list[TransactionRow]
     debts: list[DebtRow]
     incomes: list[IncomeRow]
+    rules: list[CategorizationRuleRow] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +358,37 @@ def generate_persona(config: PersonaConfig) -> PersonaData:
 
     transactions.sort(key=lambda t: t.date)
 
+    now = datetime.now(timezone.utc)
+    pending_cutoff = max(0, len(transactions) - 12)
+    for idx, txn in enumerate(transactions):
+        cat = txn.category
+        tags: list[str] = []
+        if cat == "subscriptions":
+            tags = ["Subscription"]
+        elif cat == "investment_sip":
+            tags = ["SIP", "Tax-Deductible"]
+        elif cat == "groceries":
+            tags = ["Essentials"]
+        elif cat == "dining":
+            tags = ["Food"]
+        elif cat == "rent_housing":
+            tags = ["Housing", "Fixed"]
+        elif cat == "utilities":
+            tags = ["Bills"]
+        elif cat == "healthcare":
+            tags = ["Health", "80D"]
+        elif cat == "shopping":
+            tags = ["Discretionary"]
+
+        if idx >= pending_cutoff:
+            txn.review_status = "pending"
+            txn.tags = json.dumps(tags) if tags else None
+            txn.reviewed_at = None
+        else:
+            txn.review_status = "reviewed"
+            txn.tags = json.dumps(tags) if tags else None
+            txn.reviewed_at = now
+
     debts = [
         DebtRow(
             user_id=config.user_id,
@@ -378,11 +411,29 @@ def generate_persona(config: PersonaConfig) -> PersonaData:
         )
     ]
 
+    rules = [
+        CategorizationRuleRow(
+            user_id=config.user_id,
+            match_type="contains",
+            pattern="Netflix",
+            category=TxnCategory.subscriptions.value,
+            tags=json.dumps(["Subscription"]),
+        ),
+        CategorizationRuleRow(
+            user_id=config.user_id,
+            match_type="contains",
+            pattern="Swiggy",
+            category=TxnCategory.dining.value,
+            tags=json.dumps(["Food"]),
+        ),
+    ]
+
     return PersonaData(
         accounts=list(accounts_by_key.values()),
         transactions=transactions,
         debts=debts,
         incomes=incomes,
+        rules=rules,
     )
 
 

@@ -3,6 +3,9 @@ import type {
   AnswerContract,
   Budget,
   BudgetStatus,
+  CategorizationRule,
+  CategorizationRuleCreate,
+  CategorizationRuleList,
   CreateAccountRequest,
   CreateBudgetRequest,
   CreateGoalRequest,
@@ -12,6 +15,8 @@ import type {
   NetWorthHistory,
   NotificationItem,
   RecomputeDiff,
+  ReviewQueueResponse,
+  ReviewTransactionRequest,
   SafeToSpend,
   SimulationRequest,
   SimulationResult,
@@ -121,6 +126,20 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(update),
     }),
+  reviewQueue: (userId: string, limit = 20) =>
+    apiFetch<ReviewQueueResponse>(`/api/transactions/${userId}/review-queue?limit=${limit}`),
+  reviewTransaction: (userId: string, transactionId: string, req: ReviewTransactionRequest) =>
+    apiFetch<Transaction>(`/api/transactions/${userId}/${transactionId}/review`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+
+  // Categorization Rules
+  rules: (userId: string) => apiFetch<CategorizationRuleList>(`/api/rules/${userId}`),
+  createRule: (userId: string, req: CategorizationRuleCreate) =>
+    apiFetch<CategorizationRule>(`/api/rules/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  deleteRule: (userId: string, ruleId: string) =>
+    apiFetch<{ ok: boolean; deleted_id: string }>(`/api/rules/${userId}/${ruleId}`, { method: "DELETE" }),
 
   // Budgets
   budgets: (userId: string) => apiFetch<Budget[]>(`/api/budgets/${userId}`),

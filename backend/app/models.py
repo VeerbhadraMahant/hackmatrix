@@ -43,6 +43,22 @@ class TransactionRow(SQLModel, table=True):
     description: str | None = None
     is_recurring: bool = False
     recurring_group_id: str | None = Field(default=None, index=True)
+    tags: str | None = None  # JSON-serialized list of strings, e.g. '["Subscription"]'
+    notes: str | None = None
+    review_status: str = Field(default="pending", index=True)  # "pending" | "reviewed" | "skipped"
+    reviewed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CategorizationRuleRow(SQLModel, table=True):
+    __tablename__ = "categorization_rules"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    user_id: str = Field(index=True)
+    match_type: str = "contains"  # "contains" | "exact" | "starts_with" | "regex"
+    pattern: str
+    category: str
+    tags: str | None = None  # JSON-serialized list of strings
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

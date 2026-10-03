@@ -11,6 +11,7 @@ from app.api.goals_router import router as goals_router
 from app.api.networth_router import router as networth_router
 from app.api.notifications_router import router as notifications_router
 from app.api.routes import router
+from app.api.rules_router import router as rules_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
 from app.core.audit import log_audit_event
@@ -59,6 +60,7 @@ app.include_router(goals_router)
 app.include_router(networth_router)
 app.include_router(notifications_router)
 app.include_router(tax_router)
+app.include_router(rules_router)
 
 
 @app.middleware("http")
@@ -82,7 +84,7 @@ async def audit_log_middleware(request: Request, call_next):
         # user_id is always the 3rd segment for these resources (even when
         # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
         # or /api/transactions/{user_id}/{transaction_id}).
-        if parts[1] in {"transactions", "budgets", "goals", "tax"}:
+        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules"}:
             return parts[2]
         # For these, user_id is the LAST segment (/api/dashboard/{user_id},
         # /api/alerts/gap/{user_id}, /api/accounts/{user_id}, etc.).

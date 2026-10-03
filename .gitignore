@@ -34,6 +34,7 @@ AGENTS.md
 **/*.md
 !/README.md
 !brand/*.md
+!audit/*.md
 
 # logs
 *.log

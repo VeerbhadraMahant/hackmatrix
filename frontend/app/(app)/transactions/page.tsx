@@ -29,12 +29,30 @@ import {
   Zap,
   HelpCircle,
   X,
+  Sparkles,
+  Tag,
+  FileText,
+  SlidersHorizontal,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  CornerDownRight,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAsync, useDebouncedValue, useUserId } from "@/lib/hooks";
 import { isDemoUserId } from "@/lib/user";
 import { AddDataPanel } from "@/components/dashboard/AddDataPanel";
-import type { Transaction, TxnCategory } from "@/lib/types";
+import type {
+  CategorizationRule,
+  CategorizationRuleCreate,
+  ReviewAction,
+  ReviewStatus,
+  RuleMatchType,
+  Transaction,
+  TxnCategory,
+} from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -72,24 +90,25 @@ function categoryLabel(cat: string): string {
   return item ? item.label : cat.replace(/_/g, " ");
 }
 
-type QuickFilterId = "all" | "subscriptions" | "high_value" | "inflow" | "dining" | "groceries" | "shopping";
+type QuickFilterId = "all" | "pending_review" | "subscriptions" | "high_value" | "inflow" | "dining" | "groceries";
 
 interface QuickFilter {
   id: QuickFilterId;
   label: string;
   category?: TxnCategory;
+  reviewStatus?: ReviewStatus;
   isHighValue?: boolean;
   isInflow?: boolean;
 }
 
 const QUICK_FILTERS: QuickFilter[] = [
-  { id: "all", label: "All" },
+  { id: "all", label: "All Transactions" },
+  { id: "pending_review", label: "Pending Review", reviewStatus: "pending" },
   { id: "subscriptions", label: "Subscriptions", category: "subscriptions" },
   { id: "high_value", label: "High Value (> ₹5k)", isHighValue: true },
   { id: "inflow", label: "Inflow", isInflow: true },
   { id: "dining", label: "Dining", category: "dining" },
   { id: "groceries", label: "Groceries", category: "groceries" },
-  { id: "shopping", label: "Shopping", category: "shopping" },
 ];
 
 type SortField = "date" | "merchant" | "category" | "amount";
@@ -102,7 +121,10 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 250);
   const [showAdd, setShowAdd] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [category, setCategory] = useState<TxnCategory | "">("");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>("");
+  const [tagFilter, setTagFilter] = useState<string>("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -111,23 +133,37 @@ export default function TransactionsPage() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
+  // Review Queue state
+  const [showReviewDeck, setShowReviewDeck] = useState(true);
+
   const fetchTransactions = useCallback(
     () =>
       api.transactions(userId, {
         search: debouncedSearch || undefined,
         category: category || undefined,
+        review_status: reviewStatusFilter || undefined,
+        tag: tagFilter || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         page,
         page_size: PAGE_SIZE,
       }),
-    [userId, debouncedSearch, category, dateFrom, dateTo, page]
+    [userId, debouncedSearch, category, reviewStatusFilter, tagFilter, dateFrom, dateTo, page]
   );
+
   const { data, error, loading, reload } = useAsync(
     fetchTransactions,
-    [userId, debouncedSearch, category, dateFrom, dateTo, page],
+    [userId, debouncedSearch, category, reviewStatusFilter, tagFilter, dateFrom, dateTo, page],
     { identity: userId }
   );
+
+  // Review queue fetcher
+  const fetchQueue = useCallback(() => api.reviewQueue(userId, 20), [userId]);
+  const { data: queueData, reload: reloadQueue } = useAsync(fetchQueue, [userId], { identity: userId });
+
+  // Rules fetcher
+  const fetchRules = useCallback(() => api.rules(userId), [userId]);
+  const { data: rulesData, reload: reloadRules } = useAsync(fetchRules, [userId], { identity: userId });
 
   function resetToFirstPage() {
     setPage(1);
@@ -137,6 +173,7 @@ export default function TransactionsPage() {
     if (activeQuickFilter === qf.id && qf.id !== "all") {
       setActiveQuickFilter("all");
       setCategory("");
+      setReviewStatusFilter("");
       resetToFirstPage();
       return;
     }
@@ -146,10 +183,13 @@ export default function TransactionsPage() {
 
     if (qf.category) {
       setCategory(qf.category);
-    } else if (qf.id === "all") {
+      setReviewStatusFilter("");
+    } else if (qf.reviewStatus) {
+      setReviewStatusFilter(qf.reviewStatus);
       setCategory("");
     } else {
       setCategory("");
+      setReviewStatusFilter("");
     }
   }
 
@@ -195,13 +235,16 @@ export default function TransactionsPage() {
     const itemsToExport = displayItems.length > 0 ? displayItems : data?.items ?? [];
     if (itemsToExport.length === 0) return;
 
-    const headers = ["ID", "Date", "Merchant", "Category", "Amount (INR)", "Account ID"];
+    const headers = ["ID", "Date", "Merchant", "Category", "Amount (INR)", "Review Status", "Tags", "Notes", "Account ID"];
     const rows = itemsToExport.map((t) => [
       t.id,
       t.date,
       `"${t.merchant.replace(/"/g, '""')}"`,
       t.category,
       t.amount,
+      t.review_status || "pending",
+      `"${(t.tags || []).join(", ").replace(/"/g, '""')}"`,
+      `"${(t.notes || "").replace(/"/g, '""')}"`,
       t.account_id,
     ]);
 
@@ -210,11 +253,17 @@ export default function TransactionsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", "finpilot_transactions.csv");
+    link.setAttribute("download", "finpilot_transactions_audited.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  function handleTransactionActionCompleted() {
+    reload();
+    reloadQueue();
+    reloadRules();
   }
 
   return (
@@ -229,32 +278,65 @@ export default function TransactionsPage() {
             <span className="text-xs text-pewter font-medium">• Audited Financial Feeds</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-ink mt-1.5 tracking-tight">
-            Transactions
+            Transactions & Review
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-graphite max-w-2xl leading-relaxed">
-            Search, filter, audit, and reclassify your cash-flow transactions with real-time category attribution.
+            Audit, classify, and create automated merchant rules with swipe-friendly transaction verification.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowRulesModal(true)}
+            className="text-xs font-semibold gap-1.5"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 text-pewter" />
+            <span>Rules ({rulesData?.total ?? 0})</span>
+          </Button>
+
           <Button
             variant="secondary"
             size="sm"
             onClick={handleExportCSV}
             disabled={!data || data.items.length === 0}
-            className="text-xs"
+            className="text-xs font-semibold gap-1.5"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-3.5 w-3.5 text-pewter" />
             <span>Export CSV</span>
           </Button>
         </div>
       </div>
 
+      {/* Review Queue Deck (Matching Showcase Track Pattern) */}
+      {queueData && queueData.pending_count > 0 && showReviewDeck && (
+        <ReviewQueueSection
+          userId={userId}
+          queue={queueData.items}
+          pendingCount={queueData.pending_count}
+          onCompleted={handleTransactionActionCompleted}
+          onDismiss={() => setShowReviewDeck(false)}
+        />
+      )}
+
       {/* Quick Filter Pills Row */}
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-pewter uppercase tracking-wider">
-          Quick Filters
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-pewter uppercase tracking-wider">
+            Quick Filters
+          </span>
+          {queueData && queueData.pending_count > 0 && !showReviewDeck && (
+            <button
+              type="button"
+              onClick={() => setShowReviewDeck(true)}
+              className="text-xs font-medium text-ember hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>Resume Review ({queueData.pending_count} pending)</span>
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {QUICK_FILTERS.map((qf) => {
             const isActive = activeQuickFilter === qf.id;
@@ -272,6 +354,11 @@ export default function TransactionsPage() {
               >
                 {isActive && <Check className="h-3 w-3 text-ember" />}
                 <span>{qf.label}</span>
+                {qf.id === "pending_review" && queueData && queueData.pending_count > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                    {queueData.pending_count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -300,7 +387,7 @@ export default function TransactionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-pewter pointer-events-none" />
             <input
               type="search"
-              placeholder="Search merchant or description..."
+              placeholder="Search merchant, description, tags, notes..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -316,13 +403,7 @@ export default function TransactionsPage() {
               onChange={(e) => {
                 const val = e.target.value as TxnCategory | "";
                 setCategory(val);
-                if (val === "") {
-                  setActiveQuickFilter("all");
-                } else if (QUICK_FILTERS.some((qf) => qf.category === val)) {
-                  setActiveQuickFilter(val as QuickFilterId);
-                } else {
-                  setActiveQuickFilter("all");
-                }
+                setActiveQuickFilter("all");
                 resetToFirstPage();
               }}
               className="rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember cursor-pointer"
@@ -333,6 +414,21 @@ export default function TransactionsPage() {
                   {categoryLabel(c)}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={reviewStatusFilter}
+              onChange={(e) => {
+                setReviewStatusFilter(e.target.value);
+                setActiveQuickFilter("all");
+                resetToFirstPage();
+              }}
+              className="rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember cursor-pointer"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending Review</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="skipped">Skipped</option>
             </select>
           </div>
 
@@ -364,13 +460,15 @@ export default function TransactionsPage() {
               />
             </div>
 
-            {(search || category || dateFrom || dateTo || activeQuickFilter !== "all") && (
+            {(search || category || reviewStatusFilter || tagFilter || dateFrom || dateTo || activeQuickFilter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setSearch("");
                   setCategory("");
+                  setReviewStatusFilter("");
+                  setTagFilter("");
                   setDateFrom("");
                   setDateTo("");
                   setActiveQuickFilter("all");
@@ -400,7 +498,7 @@ export default function TransactionsPage() {
       {/* Main Ledger Table Card */}
       <Card className="p-0 sm:p-0 overflow-hidden max-w-full">
         <div className="overflow-x-auto w-full max-w-full">
-          <table className="w-full min-w-[620px] text-left text-sm border-collapse">
+          <table className="w-full min-w-[760px] text-left text-sm border-collapse">
             <thead>
               <tr className="border-b border-black/[0.06] bg-fog/75 text-xs font-semibold uppercase tracking-wider text-pewter select-none">
                 <SortableHeader
@@ -409,7 +507,7 @@ export default function TransactionsPage() {
                   currentField={sortField}
                   direction={sortDirection}
                   onSort={handleSort}
-                  className="pl-6 py-3.5"
+                  className="pl-6 py-3.5 w-28"
                 />
                 <SortableHeader
                   field="merchant"
@@ -417,7 +515,7 @@ export default function TransactionsPage() {
                   currentField={sortField}
                   direction={sortDirection}
                   onSort={handleSort}
-                  className="px-6 py-3.5"
+                  className="px-6 py-3.5 min-w-[220px]"
                 />
                 <SortableHeader
                   field="category"
@@ -425,15 +523,16 @@ export default function TransactionsPage() {
                   currentField={sortField}
                   direction={sortDirection}
                   onSort={handleSort}
-                  className="px-6 py-3.5"
+                  className="px-6 py-3.5 w-48"
                 />
+                <th className="px-6 py-3.5 w-36">Status & Tags</th>
                 <SortableHeader
                   field="amount"
                   label="Amount"
                   currentField={sortField}
                   direction={sortDirection}
                   onSort={handleSort}
-                  className="pr-6 py-3.5 text-right"
+                  className="pr-6 py-3.5 text-right w-32"
                   align="right"
                 />
               </tr>
@@ -452,6 +551,9 @@ export default function TransactionsPage() {
                     <td className="px-6 py-4">
                       <Skeleton className="h-6 w-28 rounded-chip" />
                     </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </td>
                     <td className="pr-6 py-4 text-right">
                       <Skeleton className="h-4 w-20 ml-auto" />
                     </td>
@@ -461,11 +563,11 @@ export default function TransactionsPage() {
             ) : displayItems.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={4} className="p-8">
+                  <td colSpan={5} className="p-8">
                     <EmptyState
                       icon={<Receipt className="h-10 w-10 text-pewter" />}
                       title="No transactions match these filters"
-                      body="Try adjusting your search terms, removing date boundaries, or switching the active category filter."
+                      body="Try adjusting your search terms, clearing status filters, or resetting date boundaries."
                       action={
                         <Button
                           variant="secondary"
@@ -473,6 +575,8 @@ export default function TransactionsPage() {
                           onClick={() => {
                             setSearch("");
                             setCategory("");
+                            setReviewStatusFilter("");
+                            setTagFilter("");
                             setDateFrom("");
                             setDateTo("");
                             setActiveQuickFilter("all");
@@ -489,7 +593,12 @@ export default function TransactionsPage() {
             ) : (
               <tbody className="divide-y divide-black/[0.04] bg-white">
                 {displayItems.map((txn) => (
-                  <TransactionRow key={txn.id} txn={txn} userId={userId} onUpdated={reload} />
+                  <TransactionRowItem
+                    key={txn.id}
+                    txn={txn}
+                    userId={userId}
+                    onUpdated={handleTransactionActionCompleted}
+                  />
                 ))}
               </tbody>
             )}
@@ -543,9 +652,891 @@ export default function TransactionsPage() {
           </div>
         )}
       </Card>
+
+      {/* Categorization Rules Modal */}
+      {showRulesModal && (
+        <RulesManagerModal
+          userId={userId}
+          rules={rulesData?.items ?? []}
+          onClose={() => setShowRulesModal(false)}
+          onRulesChanged={handleTransactionActionCompleted}
+        />
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Review Queue Section (Interactive Card Stack matching Showcase TRACK scene)
+// ---------------------------------------------------------------------------
+
+function ReviewQueueSection({
+  userId,
+  queue,
+  pendingCount,
+  onCompleted,
+  onDismiss,
+}: {
+  userId: string;
+  queue: Transaction[];
+  pendingCount: number;
+  onCompleted: () => void;
+  onDismiss: () => void;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<TxnCategory | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [notes, setNotes] = useState<string>("");
+  const [createRule, setCreateRule] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [tagInput, setTagInput] = useState("");
+  const [showTagAdder, setShowTagAdder] = useState(false);
+
+  const currentTxn = queue[currentIndex] || queue[0];
+
+  useEffect(() => {
+    if (currentTxn) {
+      setSelectedCategory(currentTxn.category);
+      setTags(currentTxn.tags || []);
+      setNotes(currentTxn.notes || "");
+    }
+  }, [currentTxn]);
+
+  // Keyboard shortcut listener: Enter to Confirm, S to Skip
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't trigger shortcuts if focus is inside an input or textarea
+      if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if (e.key === "Enter" && !submitting && currentTxn) {
+        e.preventDefault();
+        handleReviewAction("confirm");
+      } else if ((e.key === "s" || e.key === "S") && !submitting && currentTxn) {
+        e.preventDefault();
+        handleReviewAction("skip");
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentTxn, selectedCategory, tags, notes, createRule, submitting]);
+
+  if (!currentTxn) {
+    return null;
+  }
+
+  const isInflow = currentTxn.amount > 0;
+  const config = CATEGORY_CONFIG[selectedCategory || currentTxn.category] || CATEGORY_CONFIG.other;
+  const CategoryIcon = config.icon;
+
+  async function handleReviewAction(action: ReviewAction) {
+    if (!currentTxn) return;
+    setSubmitting(true);
+    try {
+      await api.reviewTransaction(userId, currentTxn.id, {
+        action,
+        category: selectedCategory || currentTxn.category,
+        tags,
+        notes: notes.trim() || undefined,
+        create_rule: createRule,
+        rule_pattern: currentTxn.merchant.split("#")[0].trim(),
+      });
+      if (currentIndex < queue.length - 1) {
+        setCurrentIndex((prev) => prev + 1);
+      }
+      onCompleted();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleAddTag(tagText: string) {
+    const clean = tagText.trim();
+    if (clean && !tags.includes(clean)) {
+      setTags([...tags, clean]);
+    }
+    setTagInput("");
+    setShowTagAdder(false);
+  }
+
+  function handleRemoveTag(tagToRemove: string) {
+    setTags(tags.filter((t) => t !== tagToRemove));
+  }
+
+  return (
+    <Card className="border border-orange-200/80 bg-gradient-to-b from-[#FEF9EB] to-[#FBF8EF] p-5 sm:p-6 shadow-sm overflow-hidden relative">
+      <div className="flex items-center justify-between pb-4 border-b border-orange-200/50">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-full bg-ember/10 flex items-center justify-center text-ember">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-ember">
+                Smart Review Deck
+              </span>
+              <span className="text-[11px] font-semibold bg-white text-ink border border-orange-200 px-2 py-0.5 rounded-full tnum">
+                {pendingCount} left to review
+              </span>
+            </div>
+            <p className="text-xs text-graphite mt-0.5">
+              Confirm or classify pending transactions with auto-rule learning.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-pewter hover:text-ink p-1 rounded-md transition-colors"
+          title="Minimize review deck"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        {/* Main Swipe / Presentation Card */}
+        <div className="lg:col-span-7">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTxn.id}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="bg-white rounded-2xl p-5 sm:p-6 border border-black/[0.08] shadow-md flex flex-col gap-4 relative"
+            >
+              {/* Top Row: Merchant + Category Icon */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-fog flex items-center justify-center text-ink border border-black/[0.06] shadow-xs shrink-0">
+                    <CategoryIcon className="h-5 w-5 text-ember" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base sm:text-lg text-ink leading-tight">
+                      {currentTxn.merchant}
+                    </h3>
+                    <span className="text-xs text-pewter font-medium mt-0.5 block">
+                      {formatDate(currentTxn.date)} • Ref: {currentTxn.account_id}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span
+                    className={cn(
+                      "font-display text-xl sm:text-2xl font-bold tracking-tight tnum",
+                      isInflow ? "text-emerald-700" : "text-ink"
+                    )}
+                  >
+                    {isInflow ? "+" : "-"}
+                    {formatCurrency(Math.abs(currentTxn.amount))}
+                  </span>
+                </div>
+              </div>
+
+              {/* Category Selector Selector */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-black/[0.05]">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-pewter uppercase tracking-wide">
+                    Category:
+                  </span>
+                  <select
+                    value={selectedCategory || currentTxn.category}
+                    onChange={(e) => setSelectedCategory(e.target.value as TxnCategory)}
+                    className="rounded-chip border border-mist bg-fog/60 px-3 py-1.5 text-xs font-semibold text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember cursor-pointer"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {categoryLabel(cat)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Quick Auto-Rule Checkbox */}
+                <label className="flex items-center gap-2 text-xs text-graphite cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={createRule}
+                    onChange={(e) => setCreateRule(e.target.checked)}
+                    className="rounded border-mist text-ember focus:ring-ember h-3.5 w-3.5 cursor-pointer accent-ember"
+                  />
+                  <span>Always categorize this merchant as <strong>{categoryLabel(selectedCategory || currentTxn.category)}</strong></span>
+                </label>
+              </div>
+
+              {/* Tags & Notes Bar */}
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="text-xs font-semibold text-pewter flex items-center gap-1">
+                  <Tag className="h-3 w-3" />
+                  Tags:
+                </span>
+                {tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 bg-fog border border-mist text-graphite px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  >
+                    <span>{t}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t)}
+                      className="hover:text-ember"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+
+                {showTagAdder ? (
+                  <div className="inline-flex items-center gap-1">
+                    <input
+                      type="text"
+                      placeholder="Tag..."
+                      value={tagInput}
+                      autoFocus
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddTag(tagInput);
+                        if (e.key === "Escape") setShowTagAdder(false);
+                      }}
+                      className="rounded-chip border border-ember bg-white px-2 py-0.5 text-xs text-ink w-20 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddTag(tagInput)}
+                      className="text-xs font-semibold text-ember hover:underline"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowTagAdder(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-ember hover:underline cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Tag</span>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Action Controls & Shortcuts Guide */}
+        <div className="lg:col-span-5 flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5">
+            <Button
+              variant="primary"
+              size="md"
+              disabled={submitting}
+              onClick={() => handleReviewAction(selectedCategory !== currentTxn.category ? "recategorize" : "confirm")}
+              className="w-full justify-center text-sm font-semibold shadow-sm h-11 bg-ember hover:bg-ember/90 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              <span>
+                {selectedCategory !== currentTxn.category ? "Recategorize & Confirm" : "Confirm Classification"}
+              </span>
+              <span className="ml-auto text-[11px] bg-white/20 px-1.5 py-0.5 rounded font-mono">
+                ↵ Enter
+              </span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="md"
+              disabled={submitting}
+              onClick={() => handleReviewAction("skip")}
+              className="w-full justify-center text-sm font-medium h-10 border-mist"
+            >
+              <Clock className="h-4 w-4 mr-2 text-pewter" />
+              <span>Skip for Now</span>
+              <span className="ml-auto text-[11px] bg-fog px-1.5 py-0.5 rounded text-pewter font-mono">
+                S
+              </span>
+            </Button>
+          </div>
+
+          <div className="bg-white/60 rounded-xl p-3 border border-orange-200/40 text-[11px] text-graphite leading-relaxed">
+            <p>
+              💡 <strong>Smart Learning Active:</strong> FinPilot checks custom pattern rules first before falling back to natural language models.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Table Row with Detail Drawer & Interactive Popover
+// ---------------------------------------------------------------------------
+
+function TransactionRowItem({
+  txn,
+  userId,
+  onUpdated,
+}: {
+  txn: Transaction;
+  userId: string;
+  onUpdated: () => void;
+}) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Detail Drawer state
+  const [tags, setTags] = useState<string[]>(txn.tags || []);
+  const [notes, setNotes] = useState<string>(txn.notes || "");
+  const [newTag, setNewTag] = useState("");
+
+  const isInflow = txn.amount > 0;
+  const config = CATEGORY_CONFIG[txn.category] || CATEGORY_CONFIG.other;
+  const CategoryIcon = config.icon;
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopoverOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [popoverOpen]);
+
+  async function handleSelectCategory(next: TxnCategory) {
+    if (next === txn.category) {
+      setPopoverOpen(false);
+      return;
+    }
+    setSaving(true);
+    setPopoverOpen(false);
+    try {
+      await api.updateTransaction(userId, txn.id, {
+        category: next,
+        review_status: "reviewed",
+      });
+      onUpdated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveDetails() {
+    setSaving(true);
+    try {
+      await api.updateTransaction(userId, txn.id, {
+        tags,
+        notes: notes.trim() || undefined,
+        review_status: "reviewed",
+      });
+      setDetailOpen(false);
+      onUpdated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleAddTag() {
+    const clean = newTag.trim();
+    if (clean && !tags.includes(clean)) {
+      setTags([...tags, clean]);
+      setNewTag("");
+    }
+  }
+
+  function handleRemoveTag(t: string) {
+    setTags(tags.filter((x) => x !== t));
+  }
+
+  const reviewStatus = txn.review_status || "pending";
+
+  return (
+    <>
+      <tr className="hover:bg-fog/50 transition-colors duration-150 group">
+        {/* Date */}
+        <td className="whitespace-nowrap pl-6 py-3.5 text-xs text-graphite tnum font-medium">
+          {formatDate(txn.date)}
+        </td>
+
+        {/* Merchant / Description */}
+        <td className="px-6 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-fog border border-black/[0.05] text-graphite shrink-0">
+              <CategoryIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-ink text-sm truncate">
+                  {txn.merchant}
+                </span>
+                {txn.notes && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailOpen(!detailOpen)}
+                    className="text-pewter hover:text-ember"
+                    title={txn.notes}
+                  >
+                    <FileText className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <span className="text-[11px] text-pewter block mt-0.5 truncate">
+                Ref: {txn.account_id}
+              </span>
+            </div>
+          </div>
+        </td>
+
+        {/* Interactive Category Badge & Popover Picker */}
+        <td className="px-6 py-3.5 relative">
+          <div className="relative inline-block" ref={popoverRef}>
+            <button
+              type="button"
+              onClick={() => setPopoverOpen(!popoverOpen)}
+              disabled={saving}
+              className="group/badge inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ember/40 rounded-chip transition-transform active:scale-[0.98]"
+              title="Click to reclassify category"
+            >
+              <Chip tone={config.tone} className="cursor-pointer hover:shadow-xs py-1 px-2.5 text-xs">
+                <CategoryIcon className="h-3.5 w-3.5 mr-0.5 shrink-0" />
+                <span>{saving ? "Saving..." : config.label}</span>
+                <ChevronDown className="h-3 w-3 opacity-50 group-hover/badge:opacity-100 transition-opacity ml-0.5" />
+              </Chip>
+            </button>
+
+            {/* Clean Floating Popover Category Picker */}
+            {popoverOpen && (
+              <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-surface border border-mist bg-white/98 p-3 shadow-xl backdrop-blur-md">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.06]">
+                  <span className="text-xs font-semibold text-ink">Reclassify Category</span>
+                  <span className="text-[10px] text-pewter uppercase tracking-wide">Ledger Rule</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
+                  {CATEGORIES.map((catKey) => {
+                    const item = CATEGORY_CONFIG[catKey];
+                    const ItemIcon = item.icon;
+                    const isSelected = txn.category === catKey;
+
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => handleSelectCategory(catKey)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-chip px-2.5 py-1.5 text-left text-xs transition-colors cursor-pointer select-none",
+                          isSelected
+                            ? "bg-ink text-white font-semibold shadow-xs"
+                            : "text-graphite hover:bg-fog hover:text-ink"
+                        )}
+                      >
+                        <ItemIcon className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-ember" : "text-pewter")} />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </td>
+
+        {/* Review Status & Tags */}
+        <td className="px-6 py-3.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {reviewStatus === "reviewed" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <Check className="h-2.5 w-2.5" />
+                Reviewed
+              </span>
+            ) : reviewStatus === "skipped" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                Skipped
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                Pending
+              </span>
+            )}
+
+            {txn.tags && txn.tags.length > 0 ? (
+              txn.tags.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center px-1.5 py-0.2 rounded bg-fog text-graphite border border-mist text-[10px] font-medium"
+                >
+                  {t}
+                </span>
+              ))
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDetailOpen(true)}
+                className="text-[10px] text-pewter hover:text-ember font-medium opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                + Tag / Note
+              </button>
+            )}
+          </div>
+        </td>
+
+        {/* Amount with Tabular Numerals */}
+        <td className="whitespace-nowrap pr-6 py-3.5 text-right">
+          <div className="flex items-center justify-end gap-2">
+            <span
+              className={cn(
+                "tnum font-semibold text-sm",
+                isInflow ? "text-emerald-700" : "text-ink"
+              )}
+            >
+              {isInflow ? "+" : "-"}
+              {formatCurrency(Math.abs(txn.amount))}
+            </span>
+          </div>
+        </td>
+      </tr>
+
+      {/* Expandable Edit Tags & Notes Drawer */}
+      {detailOpen && (
+        <tr className="bg-fog/40 border-b border-black/[0.04]">
+          <td colSpan={5} className="px-6 py-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-black/[0.06] shadow-xs">
+              <div className="flex-1 flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-pewter">Tags:</span>
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 bg-fog border border-mist px-2 py-0.5 rounded-full text-xs font-medium text-graphite"
+                    >
+                      {t}
+                      <button type="button" onClick={() => handleRemoveTag(t)}>
+                        <X className="h-3 w-3 hover:text-ember" />
+                      </button>
+                    </span>
+                  ))}
+                  <div className="inline-flex items-center gap-1">
+                    <input
+                      type="text"
+                      placeholder="Add tag..."
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddTag();
+                      }}
+                      className="rounded-chip border border-mist px-2.5 py-1 text-xs text-ink focus:border-ember focus:outline-none w-28"
+                    />
+                    <Button variant="ghost" size="sm" onClick={handleAddTag} className="h-7 text-xs px-2">
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-pewter">Note:</span>
+                  <input
+                    type="text"
+                    placeholder="Audit note or receipt memo..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="flex-1 rounded-chip border border-mist px-2.5 py-1 text-xs text-ink focus:border-ember focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDetailOpen(false)}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={saving}
+                  onClick={handleSaveDetails}
+                  className="text-xs"
+                >
+                  {saving ? "Saving..." : "Save Details"}
+                </Button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom Categorization Rules Modal
+// ---------------------------------------------------------------------------
+
+function RulesManagerModal({
+  userId,
+  rules,
+  onClose,
+  onRulesChanged,
+}: {
+  userId: string;
+  rules: CategorizationRule[];
+  onClose: () => void;
+  onRulesChanged: () => void;
+}) {
+  const [pattern, setPattern] = useState("");
+  const [matchType, setMatchType] = useState<RuleMatchType>("contains");
+  const [category, setCategory] = useState<TxnCategory>("dining");
+  const [tagsText, setTagsText] = useState("");
+  const [applyToExisting, setApplyToExisting] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleCreateRule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pattern.trim()) return;
+    setSaving(true);
+    try {
+      const parsedTags = tagsText
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      await api.createRule(userId, {
+        pattern: pattern.trim(),
+        match_type: matchType,
+        category,
+        tags: parsedTags,
+        apply_to_existing: applyToExisting,
+      });
+
+      setPattern("");
+      setTagsText("");
+      onRulesChanged();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteRule(ruleId: string) {
+    setDeletingId(ruleId);
+    try {
+      await api.deleteRule(userId, ruleId);
+      onRulesChanged();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-2xl rounded-2xl border border-mist bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-black/[0.06] px-6 py-4 bg-fog/50">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink">
+              Custom Categorization Rules
+            </h2>
+            <p className="text-xs text-graphite mt-0.5">
+              Automate ledger classification based on merchant name matching.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-pewter hover:bg-mist/50 hover:text-ink transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+          {/* Add New Rule Form */}
+          <form onSubmit={handleCreateRule} className="bg-fog/60 rounded-xl p-4 border border-black/[0.05] flex flex-col gap-3">
+            <span className="text-xs font-bold text-ink uppercase tracking-wide">
+              Create New Auto-Rule
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
+                <label className="text-[11px] font-semibold text-pewter block mb-1">
+                  Match Type
+                </label>
+                <select
+                  value={matchType}
+                  onChange={(e) => setMatchType(e.target.value as RuleMatchType)}
+                  className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
+                >
+                  <option value="contains">Contains substring</option>
+                  <option value="exact">Exact Match</option>
+                  <option value="starts_with">Starts With</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-[11px] font-semibold text-pewter block mb-1">
+                  Merchant Pattern
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Swiggy, Netflix, Amazon"
+                  value={pattern}
+                  onChange={(e) => setPattern(e.target.value)}
+                  required
+                  className="w-full rounded-chip border border-mist bg-white px-3 py-1.5 text-xs text-ink placeholder:text-pewter focus:border-ember focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-pewter block mb-1">
+                  Assign Category
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as TxnCategory)}
+                  className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {categoryLabel(c)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-pewter block mb-1">
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Food, Tax-Deductible"
+                  value={tagsText}
+                  onChange={(e) => setTagsText(e.target.value)}
+                  className="w-full rounded-chip border border-mist bg-white px-3 py-1.5 text-xs text-ink placeholder:text-pewter focus:border-ember focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <label className="flex items-center gap-2 text-xs text-graphite cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyToExisting}
+                  onChange={(e) => setApplyToExisting(e.target.checked)}
+                  className="rounded border-mist text-ember focus:ring-ember h-3.5 w-3.5 cursor-pointer accent-ember"
+                />
+                <span>Apply immediately to existing matching transactions</span>
+              </label>
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={saving || !pattern.trim()}
+                className="text-xs bg-ember hover:bg-ember/90 text-white"
+              >
+                {saving ? "Creating..." : "Save Rule"}
+              </Button>
+            </div>
+          </form>
+
+          {/* Active Rules List */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-bold text-ink uppercase tracking-wide">
+              Active User Rules ({rules.length})
+            </span>
+
+            {rules.length === 0 ? (
+              <div className="text-center py-6 text-xs text-pewter bg-fog/30 rounded-xl border border-dashed border-mist">
+                No custom categorization rules saved yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-black/[0.05] border border-black/[0.06] rounded-xl overflow-hidden bg-white">
+                {rules.map((rule) => {
+                  const item = CATEGORY_CONFIG[rule.category] || CATEGORY_CONFIG.other;
+                  const RuleIcon = item.icon;
+
+                  return (
+                    <div
+                      key={rule.id}
+                      className="p-3 sm:px-4 flex items-center justify-between gap-3 hover:bg-fog/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-7 w-7 rounded-lg bg-fog flex items-center justify-center text-ink shrink-0">
+                          <RuleIcon className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs text-ink">
+                              &ldquo;{rule.pattern}&rdquo;
+                            </span>
+                            <span className="text-[10px] text-pewter bg-fog px-1.5 py-0.2 rounded border border-mist">
+                              {rule.match_type}
+                            </span>
+                            <CornerDownRight className="h-3 w-3 text-pewter" />
+                            <Chip tone={item.tone} className="py-0.2 px-2 text-[10px]">
+                              {item.label}
+                            </Chip>
+                          </div>
+                          {rule.tags && rule.tags.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              {rule.tags.map((t) => (
+                                <span
+                                  key={t}
+                                  className="text-[10px] font-medium bg-fog text-graphite px-1.5 py-0.2 rounded"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={deletingId === rule.id}
+                        onClick={() => handleDeleteRule(rule.id)}
+                        className="text-pewter hover:text-rose-600 p-1.5 rounded transition-colors"
+                        title="Delete rule"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-black/[0.06] px-6 py-3 bg-fog/40 flex justify-end">
+          <Button variant="secondary" size="sm" onClick={onClose} className="text-xs">
+            Done
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable Header Helper
+// ---------------------------------------------------------------------------
 
 interface SortableHeaderProps {
   field: SortField;
@@ -591,142 +1582,5 @@ function SortableHeader({
         )}
       </button>
     </th>
-  );
-}
-
-function TransactionRow({
-  txn,
-  userId,
-  onUpdated,
-}: {
-  txn: Transaction;
-  userId: string;
-  onUpdated: () => void;
-}) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  const isInflow = txn.amount > 0;
-  const config = CATEGORY_CONFIG[txn.category] || CATEGORY_CONFIG.other;
-  const CategoryIcon = config.icon;
-
-  useEffect(() => {
-    if (!popoverOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setPopoverOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [popoverOpen]);
-
-  async function handleSelectCategory(next: TxnCategory) {
-    if (next === txn.category) {
-      setPopoverOpen(false);
-      return;
-    }
-    setSaving(true);
-    setPopoverOpen(false);
-    try {
-      await api.updateTransaction(userId, txn.id, { category: next });
-      onUpdated();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <tr className="hover:bg-fog/50 transition-colors duration-150 group">
-      {/* Date */}
-      <td className="whitespace-nowrap pl-6 py-3.5 text-xs text-graphite tnum font-medium">
-        {formatDate(txn.date)}
-      </td>
-
-      {/* Merchant / Description */}
-      <td className="px-6 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-fog border border-black/[0.05] text-graphite shrink-0">
-            <CategoryIcon className="h-3.5 w-3.5" />
-          </div>
-          <div>
-            <span className="font-semibold text-ink block leading-tight text-sm">
-              {txn.merchant}
-            </span>
-            <span className="text-[11px] text-pewter block mt-0.5">
-              Ref: {txn.account_id}
-            </span>
-          </div>
-        </div>
-      </td>
-
-      {/* Interactive Category Badge & Popover Picker */}
-      <td className="px-6 py-3.5 relative">
-        <div className="relative inline-block" ref={popoverRef}>
-          <button
-            type="button"
-            onClick={() => setPopoverOpen(!popoverOpen)}
-            disabled={saving}
-            className="group/badge inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ember/40 rounded-chip transition-transform active:scale-[0.98]"
-            title="Click to reclassify category"
-          >
-            <Chip tone={config.tone} className="cursor-pointer hover:shadow-xs py-1 px-2.5 text-xs">
-              <CategoryIcon className="h-3.5 w-3.5 mr-0.5 shrink-0" />
-              <span>{saving ? "Saving..." : config.label}</span>
-              <ChevronDown className="h-3 w-3 opacity-50 group-hover/badge:opacity-100 transition-opacity ml-0.5" />
-            </Chip>
-          </button>
-
-          {/* Clean Floating Popover Category Picker */}
-          {popoverOpen && (
-            <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-surface border border-mist bg-white/98 p-3 shadow-xl backdrop-blur-md">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.06]">
-                <span className="text-xs font-semibold text-ink">Reclassify Category</span>
-                <span className="text-[10px] text-pewter uppercase tracking-wide">Ledger Rule</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
-                {CATEGORIES.map((catKey) => {
-                  const item = CATEGORY_CONFIG[catKey];
-                  const ItemIcon = item.icon;
-                  const isSelected = txn.category === catKey;
-
-                  return (
-                    <button
-                      key={catKey}
-                      type="button"
-                      onClick={() => handleSelectCategory(catKey)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-chip px-2.5 py-1.5 text-left text-xs transition-colors cursor-pointer select-none",
-                        isSelected
-                          ? "bg-ink text-white font-semibold shadow-xs"
-                          : "text-graphite hover:bg-fog hover:text-ink"
-                      )}
-                    >
-                      <ItemIcon className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-ember" : "text-pewter")} />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </td>
-
-      {/* Amount with Tabular Numerals */}
-      <td className="whitespace-nowrap pr-6 py-3.5 text-right">
-        <span
-          className={cn(
-            "tnum font-semibold text-sm",
-            isInflow ? "text-emerald-700" : "text-ink"
-          )}
-        >
-          {isInflow ? "+" : "-"}
-          {formatCurrency(Math.abs(txn.amount))}
-        </span>
-      </td>
-    </tr>
   );
 }

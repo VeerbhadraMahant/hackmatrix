@@ -182,6 +182,10 @@ export interface SimulationResult {
  * time of writing, but shapes are fixed by the shared spec. Additive only.
  */
 
+export type ReviewStatus = "pending" | "reviewed" | "skipped";
+export type RuleMatchType = "contains" | "exact" | "starts_with" | "regex";
+export type ReviewAction = "confirm" | "recategorize" | "skip";
+
 export interface Transaction {
   id: string;
   user_id: string;
@@ -190,6 +194,11 @@ export interface Transaction {
   category: TxnCategory;
   amount: number;
   account_id: string;
+  description?: string | null;
+  tags?: string[];
+  notes?: string | null;
+  review_status?: ReviewStatus;
+  reviewed_at?: string | null;
 }
 
 export interface TransactionPage {
@@ -205,6 +214,8 @@ export interface TransactionFilters {
   date_from?: string;
   date_to?: string;
   search?: string;
+  review_status?: string;
+  tag?: string;
   page?: number;
   page_size?: number;
 }
@@ -212,6 +223,46 @@ export interface TransactionFilters {
 export interface TransactionUpdate {
   category?: TxnCategory;
   merchant?: string;
+  tags?: string[];
+  notes?: string;
+  review_status?: ReviewStatus;
+}
+
+export interface ReviewQueueResponse {
+  pending_count: number;
+  items: Transaction[];
+}
+
+export interface ReviewTransactionRequest {
+  action: ReviewAction;
+  category?: TxnCategory;
+  tags?: string[];
+  notes?: string;
+  create_rule?: boolean;
+  rule_pattern?: string;
+}
+
+export interface CategorizationRule {
+  id: string;
+  user_id: string;
+  match_type: RuleMatchType;
+  pattern: string;
+  category: TxnCategory;
+  tags: string[];
+  created_at: string;
+}
+
+export interface CategorizationRuleCreate {
+  match_type?: RuleMatchType;
+  pattern: string;
+  category: TxnCategory;
+  tags?: string[];
+  apply_to_existing?: boolean;
+}
+
+export interface CategorizationRuleList {
+  items: CategorizationRule[];
+  total: number;
 }
 
 export interface Budget {

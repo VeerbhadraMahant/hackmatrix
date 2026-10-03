@@ -62,6 +62,25 @@ _RULES: list[tuple[re.Pattern, TxnCategory]] = [
 ]
 
 
+def matches_pattern(merchant: str, match_type: str, pattern: str) -> bool:
+    """Evaluate whether a merchant name satisfies a user-defined pattern rule."""
+    if not merchant or not pattern:
+        return False
+    m = merchant.lower().strip()
+    p = pattern.lower().strip()
+    if match_type == "exact":
+        return m == p
+    elif match_type == "starts_with":
+        return m.startswith(p)
+    elif match_type == "regex":
+        try:
+            return bool(re.search(pattern, merchant, re.I))
+        except re.error:
+            return False
+    else:  # default "contains"
+        return p in m
+
+
 def _rule_match(merchant: str) -> TxnCategory | None:
     for pattern, category in _RULES:
         if pattern.search(merchant):
