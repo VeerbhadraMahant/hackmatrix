@@ -150,6 +150,10 @@ class Goal(BaseModel):
     target_amount: float
     target_date: Optional[date] = None
     current_amount: float = 0
+    cover_key: str = "general"
+    funding_account_id: Optional[str] = None
+    auto_track: bool = False
+
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +486,9 @@ class GoalCreateRequest(BaseModel):
     target_amount: float
     target_date: Optional[date] = None
     current_amount: float = 0
+    cover_key: str = "general"
+    funding_account_id: Optional[str] = None
+    auto_track: bool = False
 
 
 class GoalUpdateRequest(BaseModel):
@@ -491,6 +498,9 @@ class GoalUpdateRequest(BaseModel):
     target_amount: Optional[float] = None
     target_date: Optional[date] = None
     name: Optional[str] = None
+    cover_key: Optional[str] = None
+    funding_account_id: Optional[str] = None
+    auto_track: Optional[bool] = None
 
 
 class GoalProgress(BaseModel):
@@ -499,6 +509,8 @@ class GoalProgress(BaseModel):
     projected_completion_date: Optional[date] = None
     on_track: bool
     months_remaining: Optional[float] = None
+    required_monthly: float = 0.0
+
 
 
 # ---------------------------------------------------------------------------

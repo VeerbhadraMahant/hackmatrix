@@ -17,6 +17,7 @@ from app.models import (
     BudgetRow,
     CategorizationRuleRow,
     DebtRow,
+    GoalRow,
     IncomeRow,
     TransactionRow,
 )
@@ -30,6 +31,7 @@ def _clear_user(session: Session, user_id: str) -> None:
     session.exec(delete(AccountRow).where(AccountRow.user_id == user_id))
     session.exec(delete(CategorizationRuleRow).where(CategorizationRuleRow.user_id == user_id))
     session.exec(delete(BudgetRow).where(BudgetRow.user_id == user_id))
+    session.exec(delete(GoalRow).where(GoalRow.user_id == user_id))
 
 
 def seed_all() -> None:
@@ -54,12 +56,15 @@ def seed_all() -> None:
                 session.add(rule)
             for budget in data.budgets:
                 session.add(budget)
+            for goal in data.goals:
+                session.add(goal)
             session.commit()
 
             print(
                 f"Seeded {user_id}: {len(data.accounts)} accounts, "
                 f"{len(data.transactions)} transactions, {len(data.debts)} debts, "
-                f"{len(data.incomes)} incomes, {len(data.rules)} rules, {len(data.budgets)} budgets"
+                f"{len(data.incomes)} incomes, {len(data.rules)} rules, {len(data.budgets)} budgets, "
+                f"{len(data.goals)} goals"
             )
 
 

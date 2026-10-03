@@ -94,6 +94,10 @@ class GoalRow(SQLModel, table=True):
     target_amount: float
     target_date: date | None = None
     current_amount: float = 0
+    cover_key: str = "general"
+    funding_account_id: str | None = None
+    auto_track: bool = False
+
 
 
 class EventRow(SQLModel, table=True):

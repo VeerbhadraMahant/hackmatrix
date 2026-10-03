@@ -28,6 +28,7 @@ from app.models import (
     BudgetRow,
     CategorizationRuleRow,
     DebtRow,
+    GoalRow,
     IncomeRow,
     TransactionRow,
 )
@@ -113,6 +114,8 @@ class PersonaData:
     incomes: list[IncomeRow]
     rules: list[CategorizationRuleRow] = field(default_factory=list)
     budgets: list[BudgetRow] = field(default_factory=list)
+    goals: list[GoalRow] = field(default_factory=list)
+
 
 
 # ---------------------------------------------------------------------------
@@ -472,6 +475,99 @@ def generate_persona(config: PersonaConfig) -> PersonaData:
         ),
     ]
 
+    if config.user_id == "demo-priya":
+        goals = [
+            GoalRow(
+                user_id=config.user_id,
+                name="Emergency Fund",
+                target_amount=500_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=8), 15),
+                current_amount=180_000,
+                cover_key="emergency_fund",
+                funding_account_id=accounts_by_key["savings"].id if "savings" in accounts_by_key else None,
+                auto_track=True,
+            ),
+            GoalRow(
+                user_id=config.user_id,
+                name="Dream Car (EV)",
+                target_amount=1_800_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=18), 1),
+                current_amount=350_000,
+                cover_key="dream_car",
+                funding_account_id=None,
+                auto_track=False,
+            ),
+            GoalRow(
+                user_id=config.user_id,
+                name="Japan Cherry Blossom Trip",
+                target_amount=350_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=12), 1),
+                current_amount=120_000,
+                cover_key="luxury_travel",
+                funding_account_id=None,
+                auto_track=False,
+            ),
+        ]
+    elif config.user_id == "demo-arjun":
+        goals = [
+            GoalRow(
+                user_id=config.user_id,
+                name="Kids Higher Education",
+                target_amount=2_500_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=36), 1),
+                current_amount=610_000,
+                cover_key="higher_education",
+                funding_account_id=accounts_by_key["invest"].id if "invest" in accounts_by_key else None,
+                auto_track=True,
+            ),
+            GoalRow(
+                user_id=config.user_id,
+                name="Family Europe Vacation",
+                target_amount=600_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=14), 1),
+                current_amount=200_000,
+                cover_key="luxury_travel",
+                funding_account_id=None,
+                auto_track=False,
+            ),
+        ]
+    elif config.user_id == "demo-meera":
+        goals = [
+            GoalRow(
+                user_id=config.user_id,
+                name="Pay Off Student Loan Early",
+                target_amount=260_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=24), 1),
+                current_amount=45_000,
+                cover_key="emergency_fund",
+                funding_account_id=accounts_by_key["savings"].id if "savings" in accounts_by_key else None,
+                auto_track=True,
+            ),
+            GoalRow(
+                user_id=config.user_id,
+                name="MacBook Pro M-Series",
+                target_amount=180_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=9), 1),
+                current_amount=35_000,
+                cover_key="tech_setup",
+                funding_account_id=None,
+                auto_track=False,
+            ),
+        ]
+    else:
+        goals = [
+            GoalRow(
+                user_id=config.user_id,
+                name="Emergency Fund",
+                target_amount=300_000,
+                target_date=_safe_day(anchors[-1] + relativedelta(months=12), 1),
+                current_amount=50_000,
+                cover_key="emergency_fund",
+                funding_account_id=None,
+                auto_track=False,
+            )
+        ]
+
     return PersonaData(
         accounts=list(accounts_by_key.values()),
         transactions=transactions,
@@ -479,7 +575,9 @@ def generate_persona(config: PersonaConfig) -> PersonaData:
         incomes=incomes,
         rules=rules,
         budgets=budgets,
+        goals=goals,
     )
+
 
 
 def generate_all_personas() -> dict[str, PersonaData]:

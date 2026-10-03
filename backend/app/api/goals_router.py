@@ -1,25 +1,12 @@
 """Goals CRUD + live progress projection.
 
-Not wired into app.main by this module -- the lead integrates
-`goals_router.router` into main.py alongside the sibling ledger/budgets
-router, to avoid both agents touching the same file.
-
-Monthly-contribution estimate (used for GET's progress projection): we take
-the user's trailing-3-month average net savings, i.e.
-`monthly_income * trailing_savings_rate(df, months=3)`, using the same
-trailing window and exclusions (transfers, credit-card bill payments) as
-`app.ingest.snapshot.build_dashboard_snapshot` uses for its own
-`monthly_income` / `savings_rate` fields, so this stays consistent with what
-the dashboard already reports. This is a reasonable proxy for "cash the user
-could actually put toward a goal each month" without inventing a new signal:
-it's literally what's left over after their recent real income minus real
-expenses. If a user has no transaction history (fixture-fallback / brand new
-account), the estimate is 0 and `project_goal` reports `on_track=False`,
-`projected_completion_date=None` -- an honest "we don't have enough data"
-answer rather than a fabricated number.
+Integrated in app.main alongside budgets and transactions routers.
+Provides goal creation, updates with cover art, funding account auto-tracking,
+and required monthly savings calculations.
 """
 from __future__ import annotations
 
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
@@ -28,7 +15,7 @@ from app.analytics.savings import trailing_savings_rate
 from app.core.auth import resolve_user_id
 from app.core.db import engine
 from app.ingest.snapshot import _avg_income_expenses, _transactions_df
-from app.models import GoalRow, TransactionRow
+from app.models import AccountRow, GoalRow, TransactionRow
 from app.schemas import Goal, GoalCreateRequest, GoalProgress, GoalUpdateRequest
 
 router = APIRouter()
@@ -36,21 +23,25 @@ router = APIRouter()
 _TRAILING_MONTHS = 3
 
 
-def _goal_row_to_schema(row: GoalRow) -> Goal:
+def _goal_row_to_schema(row: GoalRow, linked_balance: float | None = None) -> Goal:
+    curr_amount = row.current_amount
+    if row.auto_track and linked_balance is not None:
+        curr_amount = linked_balance
     return Goal(
         id=row.id,
         user_id=row.user_id,
         name=row.name,
         target_amount=row.target_amount,
         target_date=row.target_date,
-        current_amount=row.current_amount,
+        current_amount=curr_amount,
+        cover_key=row.cover_key or "general",
+        funding_account_id=row.funding_account_id,
+        auto_track=bool(row.auto_track),
     )
 
 
 def _estimated_monthly_contribution(user_id: str, session: Session) -> float:
-    """See module docstring: trailing-3-month avg income * trailing savings
-    rate, floored at 0 (a negative "contribution" isn't meaningful for a
-    forward goal projection)."""
+    """Trailing-3-month avg income * trailing savings rate, floored at 0."""
     txn_rows = session.exec(select(TransactionRow).where(TransactionRow.user_id == user_id)).all()
     df = _transactions_df(list(txn_rows))
     if df.empty:
@@ -62,12 +53,24 @@ def _estimated_monthly_contribution(user_id: str, session: Session) -> float:
 
 def _to_progress(goal: Goal, monthly_contribution: float) -> GoalProgress:
     projection = project_goal(goal, monthly_contribution)
+    required_monthly = 0.0
+    if goal.target_date:
+        today = date.today()
+        months = (goal.target_date.year - today.year) * 12 + (goal.target_date.month - today.month)
+        if goal.target_date.day < today.day and months > 0:
+            months = max(1, months)
+        months_to_target = max(1, months) if goal.target_date > today else 1
+        remaining = max(0.0, goal.target_amount - goal.current_amount)
+        if remaining > 0:
+            required_monthly = round(remaining / months_to_target, 2)
+
     return GoalProgress(
         goal=goal,
         monthly_contribution=monthly_contribution,
         projected_completion_date=projection["projected_completion_date"],
         on_track=projection["on_track"],
         months_remaining=projection["months_remaining"],
+        required_monthly=required_monthly,
     )
 
 
@@ -75,19 +78,41 @@ def _to_progress(goal: Goal, monthly_contribution: float) -> GoalProgress:
 def list_goals(user_id: str = Depends(resolve_user_id)) -> list[GoalProgress]:
     with Session(engine) as session:
         rows = session.exec(select(GoalRow).where(GoalRow.user_id == user_id)).all()
+        accounts = {acc.id: acc for acc in session.exec(select(AccountRow).where(AccountRow.user_id == user_id)).all()}
         monthly_contribution = _estimated_monthly_contribution(user_id, session)
-    return [_to_progress(_goal_row_to_schema(row), monthly_contribution) for row in rows]
+        result = []
+        for row in rows:
+            linked_bal = None
+            if row.funding_account_id and row.funding_account_id in accounts:
+                linked_bal = max(0.0, accounts[row.funding_account_id].balance)
+            schema = _goal_row_to_schema(row, linked_balance=linked_bal)
+            result.append(_to_progress(schema, monthly_contribution))
+    return result
 
 
 @router.post("/api/goals/{user_id}", response_model=GoalProgress)
 def create_goal(req: GoalCreateRequest, user_id: str = Depends(resolve_user_id)) -> GoalProgress:
     with Session(engine) as session:
+        if req.funding_account_id:
+            acc = session.get(AccountRow, req.funding_account_id)
+            if not acc or acc.user_id != user_id:
+                raise HTTPException(400, "Funding account does not exist or does not belong to user")
+
+        current_amount = req.current_amount
+        if req.auto_track and req.funding_account_id:
+            acc = session.get(AccountRow, req.funding_account_id)
+            if acc:
+                current_amount = max(0.0, acc.balance)
+
         row = GoalRow(
             user_id=user_id,
             name=req.name,
             target_amount=req.target_amount,
             target_date=req.target_date,
-            current_amount=req.current_amount,
+            current_amount=current_amount,
+            cover_key=req.cover_key or "general",
+            funding_account_id=req.funding_account_id,
+            auto_track=req.auto_track,
         )
         session.add(row)
         session.commit()
@@ -109,6 +134,14 @@ def update_goal(
 ) -> GoalProgress:
     with Session(engine) as session:
         row = _get_owned_goal(session, user_id, goal_id)
+        if req.funding_account_id is not None:
+            if req.funding_account_id != "":
+                acc = session.get(AccountRow, req.funding_account_id)
+                if not acc or acc.user_id != user_id:
+                    raise HTTPException(400, "Funding account does not exist or does not belong to user")
+                row.funding_account_id = req.funding_account_id
+            else:
+                row.funding_account_id = None
         if req.name is not None:
             row.name = req.name
         if req.current_amount is not None:
@@ -117,6 +150,15 @@ def update_goal(
             row.target_amount = req.target_amount
         if req.target_date is not None:
             row.target_date = req.target_date
+        if req.cover_key is not None:
+            row.cover_key = req.cover_key
+        if req.auto_track is not None:
+            row.auto_track = req.auto_track
+            if row.auto_track and row.funding_account_id:
+                acc = session.get(AccountRow, row.funding_account_id)
+                if acc:
+                    row.current_amount = max(0.0, acc.balance)
+
         session.add(row)
         session.commit()
         session.refresh(row)

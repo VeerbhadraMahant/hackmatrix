@@ -315,6 +315,9 @@ export interface Goal {
   target_amount: number;
   target_date: string | null;
   current_amount: number;
+  cover_key?: string;
+  funding_account_id?: string | null;
+  auto_track?: boolean;
 }
 
 export interface GoalProgress {
@@ -323,6 +326,7 @@ export interface GoalProgress {
   projected_completion_date: string | null;
   on_track: boolean;
   months_remaining: number | null;
+  required_monthly?: number;
 }
 
 export interface CreateGoalRequest {
@@ -330,12 +334,19 @@ export interface CreateGoalRequest {
   target_amount: number;
   target_date?: string | null;
   current_amount?: number;
+  cover_key?: string;
+  funding_account_id?: string | null;
+  auto_track?: boolean;
 }
 
 export interface UpdateGoalRequest {
+  name?: string;
   current_amount?: number;
   target_date?: string | null;
   target_amount?: number;
+  cover_key?: string;
+  funding_account_id?: string | null;
+  auto_track?: boolean;
 }
 
 export interface NetWorthPoint {
