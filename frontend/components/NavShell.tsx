@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/SignInButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { FinPilotLogo } from "@/components/FinPilotLogo";
 import { useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 
@@ -95,9 +96,9 @@ export function NavShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 glass-header">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-3 sm:px-8">
           {/* Logo & Brand */}
-          <Link href="/dashboard" className="flex items-center gap-2 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-paper font-display font-medium text-base shadow-[0_2px_8px_rgba(0,0,0,0.2)] group-hover:scale-105 transition-transform">
-              F
+          <Link href="/dashboard" className="flex items-center gap-2.5 group" aria-label="FinPilot Dashboard">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink/5 p-1 border border-mist shadow-[0_2px_8px_rgba(0,0,0,0.04)] group-hover:scale-105 transition-transform">
+              <FinPilotLogo size={24} />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="font-display text-xl font-medium tracking-tight text-ink">

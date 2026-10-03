@@ -33,6 +33,7 @@ CLAUDE.md
 AGENTS.md
 **/*.md
 !/README.md
+!brand/*.md
 
 # logs
 *.log

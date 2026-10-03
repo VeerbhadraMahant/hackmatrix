@@ -5,6 +5,7 @@ import type { DashboardSnapshot, Account } from "@/lib/types";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
+import { FinPilotLogo } from "@/components/FinPilotLogo";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -105,8 +106,9 @@ export function ExecutiveStatement({ dashboard, accounts, userId }: ExecutiveSta
       <header className="border-b-2 border-black pb-6 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-black text-white font-display font-medium text-lg print:border print:border-black">
-              F
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink/5 p-1 border border-black/10 print:border-black print:bg-transparent">
+              <FinPilotLogo size={30} theme="default" className="print:hidden" />
+              <FinPilotLogo size={30} theme="black" className="hidden print:block" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">

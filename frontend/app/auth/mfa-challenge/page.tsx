@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { FinPilotLogo } from "@/components/FinPilotLogo";
 
 /**
  * Shown when a signed-in user has a verified TOTP factor enrolled but this
@@ -62,6 +63,7 @@ export default function MfaChallengePage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-fog px-4">
       <Card className="w-full max-w-sm">
+        <FinPilotLogo size={36} className="mb-4" />
         <h1 className="font-display text-xl text-ink">Enter your code</h1>
         <p className="mt-1 text-sm text-graphite">
           Open your authenticator app and enter the 6-digit code to finish signing in.

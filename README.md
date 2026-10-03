@@ -1,6 +1,6 @@
-<div align="center">
-
-# 🧭 FinPilot
+<p align="center">
+  <img src="frontend/public/logo-horizontal.svg" alt="FinPilot — Autonomous AI Financial Health Copilot" width="380" />
+</p>
 
 ### Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine
 

@@ -15,15 +15,38 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "FinPilot -- AI Financial Health Copilot",
+  metadataBase: new URL("https://finpilot.ai"),
+  title: "FinPilot — AI Financial Health Copilot",
   description:
     "A consolidated view of your financial health: spending patterns, debt pressure, cash-flow forecasts, and recommendations with their expected impact.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    title: "FinPilot — AI Financial Health Copilot",
+    description:
+      "Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "FinPilot" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FinPilot — AI Financial Health Copilot",
+    description:
+      "Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine.",
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#090a0f",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
