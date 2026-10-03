@@ -26,6 +26,7 @@ import type {
   TransactionFilters,
   TransactionPage,
   TransactionUpdate,
+  UpdateBudgetRequest,
   UpdateGoalRequest,
 } from "./types";
 import { createClient } from "./supabase/client";
@@ -145,6 +146,8 @@ export const api = {
   budgets: (userId: string) => apiFetch<Budget[]>(`/api/budgets/${userId}`),
   createBudget: (userId: string, req: CreateBudgetRequest) =>
     apiFetch<Budget>(`/api/budgets/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  updateBudget: (userId: string, budgetId: string, req: UpdateBudgetRequest) =>
+    apiFetch<Budget>(`/api/budgets/${userId}/${budgetId}`, { method: "PATCH", body: JSON.stringify(req) }),
   deleteBudget: (userId: string, budgetId: string) =>
     apiFetch<void>(`/api/budgets/${userId}/${budgetId}`, { method: "DELETE" }),
   budgetStatus: (userId: string) => apiFetch<BudgetStatus[]>(`/api/budgets/${userId}/status`),

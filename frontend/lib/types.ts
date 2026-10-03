@@ -270,11 +270,21 @@ export interface Budget {
   user_id: string;
   category: TxnCategory;
   monthly_limit: number;
+  rollover_enabled?: boolean;
+  rollover_cap?: number | null;
 }
 
 export interface CreateBudgetRequest {
   category: TxnCategory;
   monthly_limit: number;
+  rollover_enabled?: boolean;
+  rollover_cap?: number | null;
+}
+
+export interface UpdateBudgetRequest {
+  monthly_limit?: number;
+  rollover_enabled?: boolean;
+  rollover_cap?: number | null;
 }
 
 export type BudgetHealth = "under" | "near" | "over";
@@ -286,6 +296,10 @@ export interface BudgetStatus {
   remaining: number;
   percent_used: number;
   status: BudgetHealth;
+  rollover_amount?: number;
+  total_available?: number;
+  rollover_enabled?: boolean;
+  rollover_cap?: number | null;
 }
 
 export interface SafeToSpend {

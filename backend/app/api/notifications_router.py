@@ -123,6 +123,41 @@ def get_notifications(user_id: str = Depends(resolve_user_id)) -> list[Notificat
     except Exception:
         pass
 
+    # --- over-budget & near-limit envelope alerts -------------------------
+    try:
+        from app.api.budgets_router import budget_status as compute_budget_status
+
+        budgets_statuses = compute_budget_status(user_id=user_id)
+        for bs in budgets_statuses:
+            cat_val = bs.category.value if hasattr(bs.category, "value") else str(bs.category)
+            cat_name = cat_val.replace("_", " ").title()
+            effective_lim = bs.monthly_limit + bs.rollover_amount
+            if bs.status == "over" or bs.percent_used >= 100.0:
+                over_amt = bs.spent_so_far - effective_lim
+                items.append(
+                    NotificationItem(
+                        id=_stable_id("over_budget", cat_val, today.strftime("%Y-%m")),
+                        type="over_budget",
+                        severity="critical",
+                        text=f"'{cat_name}' budget exceeded by ₹{over_amt:,.0f} (spent ₹{bs.spent_so_far:,.0f} of ₹{effective_lim:,.0f}).",
+                        date=today,
+                        source_ref="/budgets",
+                    )
+                )
+            elif bs.status == "near" or bs.percent_used >= 80.0:
+                items.append(
+                    NotificationItem(
+                        id=_stable_id("near_budget", cat_val, today.strftime("%Y-%m")),
+                        type="over_budget",
+                        severity="warning",
+                        text=f"'{cat_name}' budget at {bs.percent_used:.0f}% capacity (spent ₹{bs.spent_so_far:,.0f} of ₹{effective_lim:,.0f}).",
+                        date=today,
+                        source_ref="/budgets",
+                    )
+                )
+    except Exception:
+        pass
+
     # --- cash-flow gap ----------------------------------------------------
     try:
         gap_date = snapshot.forecast.first_gap_date

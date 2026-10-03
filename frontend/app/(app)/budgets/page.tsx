@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Bar,
@@ -33,6 +34,10 @@ import {
   Utensils,
   Zap,
   HelpCircle,
+  RotateCcw,
+  Sliders,
+  ArrowRight,
+  TrendingDown,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
@@ -109,6 +114,8 @@ export default function BudgetsPage() {
 
   const [newCategory, setNewCategory] = useState<TxnCategory>(BUDGETABLE_CATEGORIES[0]);
   const [newLimit, setNewLimit] = useState("");
+  const [newRollover, setNewRollover] = useState(true);
+  const [newRolloverCap, setNewRolloverCap] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -127,13 +134,21 @@ export default function BudgetsPage() {
     }
     setCreating(true);
     setCreateError(null);
-    // Optimistic: the envelope appears (and the form clears) immediately; the
-    // post-write data-changed refetch swaps in the server's real numbers.
     const category = newCategory;
+    const cap = newRolloverCap ? Number(newRolloverCap) : undefined;
+
     budgets.mutate((prev) => [
       ...(prev ?? []).filter((b) => b.category !== category),
-      { id: `tmp-${Date.now()}`, user_id: userId, category, monthly_limit: limit },
+      {
+        id: `tmp-${Date.now()}`,
+        user_id: userId,
+        category,
+        monthly_limit: limit,
+        rollover_enabled: newRollover,
+        rollover_cap: cap,
+      },
     ]);
+
     status.mutate((prev) => {
       const list = prev ?? [];
       const existing = list.find((s) => s.category === category);
@@ -145,12 +160,23 @@ export default function BudgetsPage() {
         remaining: limit - spent,
         percent_used: limit > 0 ? (spent / limit) * 100 : 0,
         status: existing?.status ?? "under",
+        rollover_enabled: newRollover,
+        rollover_cap: cap,
+        rollover_amount: 0,
+        total_available: limit - spent,
       };
       return existing ? list.map((s) => (s.category === category ? next : s)) : [...list, next];
     });
+
     setNewLimit("");
+    setNewRolloverCap("");
     try {
-      await api.createBudget(userId, { category, monthly_limit: limit });
+      await api.createBudget(userId, {
+        category,
+        monthly_limit: limit,
+        rollover_enabled: newRollover,
+        rollover_cap: cap,
+      });
     } catch (err) {
       budgets.reload();
       status.reload();
@@ -158,6 +184,19 @@ export default function BudgetsPage() {
       setCreateError(err instanceof Error ? err.message : "Could not create budget envelope");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleToggleRollover(budgetId: string, currentVal: boolean) {
+    budgets.mutate((prev) =>
+      (prev ?? []).map((b) => (b.id === budgetId ? { ...b, rollover_enabled: !currentVal } : b))
+    );
+    try {
+      await api.updateBudget(userId, budgetId, { rollover_enabled: !currentVal });
+      status.reload();
+    } catch {
+      budgets.reload();
+      status.reload();
     }
   }
 
@@ -175,14 +214,22 @@ export default function BudgetsPage() {
 
   const budgetStatuses = status.data ?? [];
   const totalLimit = budgetStatuses.reduce((acc, b) => acc + b.monthly_limit, 0);
+  const totalRollover = budgetStatuses.reduce((acc, b) => acc + (b.rollover_amount ?? 0), 0);
   const totalSpent = budgetStatuses.reduce((acc, b) => acc + b.spent_so_far, 0);
-  const totalRemaining = totalLimit - totalSpent;
-  const overallUsedPct = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0;
+  const totalAvailable = totalLimit + totalRollover - totalSpent;
+  const overallUsedPct = (totalLimit + totalRollover) > 0
+    ? Math.min(100, Math.round((totalSpent / (totalLimit + totalRollover)) * 100))
+    : 0;
+
+  // Identify over-budget and near-limit envelopes for the top alert banner
+  const overEnvelopes = budgetStatuses.filter((b) => b.status === "over" || b.percent_used >= 100);
+  const nearEnvelopes = budgetStatuses.filter((b) => b.status === "near");
 
   const chartData = budgetStatuses.map((b) => ({
     category: categoryLabel(b.category),
     spent: b.spent_so_far,
-    limit: b.monthly_limit,
+    limit: b.monthly_limit + (b.rollover_amount ?? 0),
+    rollover: b.rollover_amount ?? 0,
     status: b.status,
   }));
 
@@ -194,7 +241,7 @@ export default function BudgetsPage() {
   const anyError = status.error ?? budgets.error ?? safeToSpend.error;
 
   return (
-    <div className="flex flex-col gap-8 pb-16">
+    <div className="flex flex-col gap-8 pb-16 min-w-0 max-w-full">
       {/* Editorial Fraunces Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/[0.04]">
         <div>
@@ -202,16 +249,46 @@ export default function BudgetsPage() {
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
               Cash-Flow Allocation
             </span>
-            <span className="text-xs text-pewter font-medium">• Proactive Envelope Budgeting</span>
+            <span className="text-xs text-pewter font-medium">• Proactive Envelope Rollover</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-ink mt-1.5 tracking-tight">
-            Budgets & Safe-to-Spend
+            Budgets & Rollover
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-graphite max-w-2xl leading-relaxed">
-            Set monthly category envelopes, monitor real-time burn velocity, and protect your discretionary liquidity.
+            Set monthly category envelopes, automatically roll over unspent surplus, and protect your discretionary liquidity.
           </p>
         </div>
       </div>
+
+      {/* Live Over-Budget / Near-Limit Alert Banner */}
+      {overEnvelopes.length > 0 && (
+        <Card className="border border-rose-200 bg-rose-50/60 p-4 sm:p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 shrink-0 mt-0.5">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-rose-900">
+                  {overEnvelopes.length} Category Envelope{overEnvelopes.length > 1 ? "s" : ""} Exceeded
+                </h3>
+                <p className="text-xs text-rose-800 mt-0.5">
+                  {overEnvelopes.map((e) => categoryLabel(e.category)).join(", ")} exceeded monthly limit + rollover buffer.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/simulate"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800 hover:text-rose-950 bg-white/80 border border-rose-300 px-3 py-1.5 rounded-chip transition-colors self-start sm:self-center shrink-0"
+            >
+              <TrendingDown className="h-3.5 w-3.5" />
+              <span>Simulate 15% Spend Cut</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Hero "Safe-to-Spend" Tactile Card */}
       {safeToSpend.loading && !safeToSpend.data ? (
@@ -273,6 +350,12 @@ export default function BudgetsPage() {
                   <span className="text-xs text-graphite font-medium">
                     for remaining <span className="text-ink font-semibold tnum">{daysRemaining} days</span> this month
                   </span>
+                  {totalRollover > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-ember border border-ember/20">
+                      <RotateCcw className="h-3 w-3" />
+                      +{formatCurrency(totalRollover)} total rollover surplus
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-[11px] text-pewter mt-1">
@@ -283,7 +366,7 @@ export default function BudgetsPage() {
               {/* Right Column: Envelope Capacity Progress Meter */}
               <div className="lg:col-span-5 flex flex-col gap-3 rounded-surface border border-black/[0.06] bg-fog/60 p-4 sm:p-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink">Total Envelope Burn</span>
+                  <span className="text-xs font-semibold text-ink">Total Envelope Utilization</span>
                   <span className="text-xs font-bold text-ink tnum">
                     {overallUsedPct}% utilized
                   </span>
@@ -313,16 +396,16 @@ export default function BudgetsPage() {
                   </div>
                   <div className="text-right">
                     <span className="text-[11px] text-pewter block">
-                      {totalRemaining >= 0 ? "Surplus Buffer" : "Deficit Overrun"}
+                      {totalAvailable >= 0 ? "Total Available Surplus" : "Deficit Overrun"}
                     </span>
                     <span
                       className={cn(
                         "font-semibold tnum",
-                        totalRemaining >= 0 ? "text-emerald-700" : "text-rose-600"
+                        totalAvailable >= 0 ? "text-emerald-700" : "text-rose-600"
                       )}
                     >
-                      {totalRemaining >= 0 ? "+" : "-"}
-                      {formatCurrency(Math.abs(totalRemaining))}
+                      {totalAvailable >= 0 ? "+" : "-"}
+                      {formatCurrency(Math.abs(totalAvailable))}
                     </span>
                   </div>
                 </div>
@@ -337,9 +420,9 @@ export default function BudgetsPage() {
         <CardHeader className="mb-4">
           <div className="flex items-center justify-between w-full">
             <div>
-              <CardTitle className="text-base font-semibold text-ink">Create New Budget Envelope</CardTitle>
+              <CardTitle className="text-base font-semibold text-ink">Create Budget Envelope</CardTitle>
               <p className="text-xs text-graphite mt-0.5">
-                Define a disciplined monthly spending cap to constrain discretionary categories.
+                Define a monthly spending cap with optional surplus rollover into next month.
               </p>
             </div>
             <span className="text-xs font-semibold text-pewter uppercase tracking-wider">
@@ -350,7 +433,7 @@ export default function BudgetsPage() {
 
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-            <div className="sm:col-span-5 flex flex-col gap-1.5">
+            <div className="sm:col-span-4 flex flex-col gap-1.5">
               <label htmlFor="budget-category" className="text-xs font-medium text-graphite">
                 Category
               </label>
@@ -368,7 +451,7 @@ export default function BudgetsPage() {
               </select>
             </div>
 
-            <div className="sm:col-span-4 flex flex-col gap-1.5">
+            <div className="sm:col-span-3 flex flex-col gap-1.5">
               <label htmlFor="budget-limit" className="text-xs font-medium text-graphite">
                 Monthly Limit (₹)
               </label>
@@ -386,12 +469,27 @@ export default function BudgetsPage() {
               />
             </div>
 
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-3 flex flex-col gap-1.5">
+              <label htmlFor="budget-cap" className="text-xs font-medium text-graphite">
+                Rollover Cap (₹, optional)
+              </label>
+              <input
+                id="budget-cap"
+                type="number"
+                min={0}
+                placeholder="e.g. 5000"
+                value={newRolloverCap}
+                onChange={(e) => setNewRolloverCap(e.target.value)}
+                className="w-full rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember tnum"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
               <Button
                 variant="primary"
                 onClick={handleCreate}
                 disabled={creating}
-                className="w-full h-10 text-xs font-semibold"
+                className="w-full h-10 text-xs font-semibold bg-ember hover:bg-ember/90 text-white"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>{creating ? "Adding..." : "Add Envelope"}</span>
@@ -399,19 +497,32 @@ export default function BudgetsPage() {
             </div>
           </div>
 
-          {/* Quick preset amount chips */}
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-pewter font-medium">Quick Limit Presets:</span>
-            {PRESET_AMOUNTS.map((amt) => (
-              <button
-                key={amt}
-                type="button"
-                onClick={() => setNewLimit(String(amt))}
-                className="rounded-full px-2.5 py-0.5 text-xs font-medium text-graphite bg-fog border border-mist hover:bg-white hover:text-ink hover:border-black/[0.12] transition-colors cursor-pointer tnum"
-              >
-                {formatCurrency(amt)}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-black/[0.04]">
+            {/* Quick preset amount chips */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-pewter font-medium">Quick Limit Presets:</span>
+              {PRESET_AMOUNTS.map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => setNewLimit(String(amt))}
+                  className="rounded-full px-2.5 py-0.5 text-xs font-medium text-graphite bg-fog border border-mist hover:bg-white hover:text-ink hover:border-black/[0.12] transition-colors cursor-pointer tnum"
+                >
+                  {formatCurrency(amt)}
+                </button>
+              ))}
+            </div>
+
+            {/* Rollover checkbox */}
+            <label className="flex items-center gap-2 text-xs text-graphite cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={newRollover}
+                onChange={(e) => setNewRollover(e.target.checked)}
+                className="rounded border-mist text-ember focus:ring-ember h-3.5 w-3.5 cursor-pointer accent-ember"
+              />
+              <span>Enable surplus rollover from previous months</span>
+            </label>
           </div>
 
           {createError && (
@@ -457,9 +568,9 @@ export default function BudgetsPage() {
         <>
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-ink">Category Envelopes</h2>
+              <h2 className="text-base font-semibold text-ink">Category Envelopes ({budgetStatuses.length})</h2>
               <span className="text-xs text-pewter font-medium">
-                Hairline tactile envelope cards
+                Surplus Rollover & Burn Tracking
               </span>
             </div>
 
@@ -469,6 +580,7 @@ export default function BudgetsPage() {
                   key={b.category}
                   status={b}
                   budgetId={budgetIdByCategory.get(b.category)}
+                  onToggleRollover={handleToggleRollover}
                   onDelete={handleDelete}
                 />
               ))}
@@ -484,7 +596,7 @@ export default function BudgetsPage() {
                     Envelope Utilization & Velocity
                   </CardTitle>
                   <p className="text-xs text-graphite mt-0.5">
-                    Comparative actual spend vs. monthly limit by category envelope.
+                    Comparative actual spend vs. effective monthly limit (base limit + rollover surplus).
                   </p>
                 </div>
 
@@ -548,15 +660,19 @@ export default function BudgetsPage() {
 function BudgetEnvelopeCard({
   status,
   budgetId,
+  onToggleRollover,
   onDelete,
 }: {
   status: BudgetStatus;
   budgetId: string | undefined;
+  onToggleRollover: (budgetId: string, currentVal: boolean) => void;
   onDelete: (budgetId: string) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const rolloverAmt = status.rollover_amount ?? 0;
+  const effectiveLimit = status.monthly_limit + rolloverAmt;
   const width = normalizePercent(status.percent_used);
-  const isOver = status.status === "over" || status.remaining < 0;
+  const isOver = status.status === "over" || (status.total_available !== undefined && status.total_available < 0);
   const isNear = status.status === "near";
 
   const config = CATEGORY_ICONS[status.category] || CATEGORY_ICONS.other;
@@ -593,11 +709,20 @@ function BudgetEnvelopeCard({
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-ink leading-tight">
-              {categoryLabel(status.category)}
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-ink leading-tight">
+                {categoryLabel(status.category)}
+              </h4>
+              {rolloverAmt > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <RotateCcw className="h-2.5 w-2.5" />
+                  +{formatCurrency(rolloverAmt)} Rollover
+                </span>
+              )}
+            </div>
             <p className="text-xs text-pewter mt-0.5 tnum">
-              Cap: {formatCurrency(status.monthly_limit)} / month
+              Base: {formatCurrency(status.monthly_limit)}
+              {rolloverAmt > 0 && ` • Effective: ${formatCurrency(effectiveLimit)}`}
             </p>
           </div>
         </div>
@@ -638,7 +763,7 @@ function BudgetEnvelopeCard({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-pewter font-medium tnum">
-            Spent {formatCurrency(status.spent_so_far)}
+            Spent {formatCurrency(status.spent_so_far)} of {formatCurrency(effectiveLimit)}
           </span>
           <span className="font-bold text-ink tnum">{width}%</span>
         </div>
@@ -655,20 +780,38 @@ function BudgetEnvelopeCard({
           />
         </div>
 
-        {/* Exact Surplus / Deficit Callout */}
+        {/* Exact Surplus / Deficit Callout & Rollover Toggle */}
         <div className="flex items-center justify-between text-xs pt-1">
-          <span className="text-pewter text-[11px]">
-            {isOver ? "Deficit overrun:" : "Remaining buffer:"}
-          </span>
+          <div className="flex items-center gap-2">
+            {budgetId && (
+              <button
+                type="button"
+                onClick={() => onToggleRollover(budgetId, Boolean(status.rollover_enabled))}
+                className={cn(
+                  "inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer",
+                  status.rollover_enabled ? "text-emerald-700 hover:text-emerald-900" : "text-pewter hover:text-ink"
+                )}
+                title="Toggle unspent surplus rollover into next month"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>{status.rollover_enabled ? "Rollover ON" : "Rollover OFF"}</span>
+              </button>
+            )}
+          </div>
+
           <span
             className={cn(
               "font-bold tnum",
               isOver ? "text-rose-600 font-semibold" : "text-emerald-700 font-semibold"
             )}
           >
-            {status.remaining >= 0
-              ? `+${formatCurrency(status.remaining)} remaining`
-              : `-${formatCurrency(Math.abs(status.remaining))} over`}
+            {status.total_available !== undefined
+              ? status.total_available >= 0
+                ? `+${formatCurrency(status.total_available)} available`
+                : `-${formatCurrency(Math.abs(status.total_available))} over`
+              : status.remaining >= 0
+                ? `+${formatCurrency(status.remaining)} remaining`
+                : `-${formatCurrency(Math.abs(status.remaining))} over`}
           </span>
         </div>
       </div>
@@ -684,6 +827,7 @@ interface CustomTooltipProps {
       category: string;
       spent: number;
       limit: number;
+      rollover: number;
       status: string;
     };
   }>;
@@ -719,11 +863,17 @@ function CustomGlassTooltip({ active, payload }: CustomTooltipProps) {
           <span className="font-bold text-ink tnum">{formatCurrency(data.spent)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-pewter">Monthly Limit:</span>
+          <span className="text-pewter">Effective Cap:</span>
           <span className="font-medium text-graphite tnum">{formatCurrency(data.limit)}</span>
         </div>
+        {data.rollover > 0 && (
+          <div className="flex items-center justify-between text-[11px] text-emerald-700">
+            <span>Rollover Surplus:</span>
+            <span className="font-semibold tnum">+{formatCurrency(data.rollover)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between border-t border-black/[0.04] pt-1">
-          <span className="text-pewter">{isOver ? "Deficit Overrun:" : "Remaining Surplus:"}</span>
+          <span className="text-pewter">{isOver ? "Deficit Overrun:" : "Available Buffer:"}</span>
           <span className={cn("font-bold tnum", isOver ? "text-rose-600" : "text-emerald-700")}>
             {diff >= 0 ? `+${formatCurrency(diff)}` : `-${formatCurrency(Math.abs(diff))}`}
           </span>

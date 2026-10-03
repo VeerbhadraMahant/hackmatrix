@@ -431,11 +431,21 @@ class Budget(BaseModel):
     user_id: str
     category: TxnCategory
     monthly_limit: float
+    rollover_enabled: bool = False
+    rollover_cap: Optional[float] = None
 
 
 class BudgetCreateRequest(BaseModel):
     category: TxnCategory
     monthly_limit: float
+    rollover_enabled: bool = False
+    rollover_cap: Optional[float] = None
+
+
+class BudgetUpdateRequest(BaseModel):
+    monthly_limit: Optional[float] = None
+    rollover_enabled: Optional[bool] = None
+    rollover_cap: Optional[float] = None
 
 
 BudgetHealth = Literal["under", "near", "over"]
@@ -448,6 +458,10 @@ class BudgetStatus(BaseModel):
     remaining: float
     percent_used: float
     status: BudgetHealth
+    rollover_amount: float = 0.0
+    total_available: float = 0.0
+    rollover_enabled: bool = False
+    rollover_cap: Optional[float] = None
 
 
 class SafeToSpend(BaseModel):
@@ -505,11 +519,11 @@ class NetWorthHistory(BaseModel):
 
 # ---------------------------------------------------------------------------
 # Notifications feed (added by goals-networth-backend-agent -- live-computed
-# merge of anomalies / recommendations / upcoming bills / cash-flow gaps,
-# not persisted).
+# merge of anomalies / recommendations / upcoming bills / cash-flow gaps /
+# over-budget alerts, not persisted).
 # ---------------------------------------------------------------------------
 
-NotificationType = Literal["anomaly", "recommendation", "upcoming_bill", "cash_flow_gap"]
+NotificationType = Literal["anomaly", "recommendation", "upcoming_bill", "cash_flow_gap", "over_budget"]
 NotificationSeverity = Literal["info", "warning", "critical"]
 
 

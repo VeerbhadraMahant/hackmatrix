@@ -31,6 +31,23 @@ def _run_migrations(db_engine) -> None:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN review_status TEXT DEFAULT 'pending'"))
             if "reviewed_at" not in columns:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN reviewed_at TIMESTAMP"))
+        if "budgets" in tables:
+            budget_cols = {col["name"] for col in inspector.get_columns("budgets")}
+            if "rollover_enabled" not in budget_cols:
+                conn.execute(text("ALTER TABLE budgets ADD COLUMN rollover_enabled BOOLEAN DEFAULT 0"))
+            if "rollover_cap" not in budget_cols:
+                conn.execute(text("ALTER TABLE budgets ADD COLUMN rollover_cap FLOAT"))
+            if "created_at" not in budget_cols:
+                conn.execute(text("ALTER TABLE budgets ADD COLUMN created_at TIMESTAMP"))
+
+        if "goals" in tables:
+            goal_cols = {col["name"] for col in inspector.get_columns("goals")}
+            if "cover_key" not in goal_cols:
+                conn.execute(text("ALTER TABLE goals ADD COLUMN cover_key TEXT DEFAULT 'general'"))
+            if "funding_account_id" not in goal_cols:
+                conn.execute(text("ALTER TABLE goals ADD COLUMN funding_account_id TEXT"))
+            if "auto_track" not in goal_cols:
+                conn.execute(text("ALTER TABLE goals ADD COLUMN auto_track BOOLEAN DEFAULT 0"))
 
 
 def init_db() -> None:

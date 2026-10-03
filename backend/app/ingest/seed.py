@@ -14,6 +14,7 @@ from sqlmodel import Session, delete, select
 from app.core.db import engine, init_db
 from app.models import (
     AccountRow,
+    BudgetRow,
     CategorizationRuleRow,
     DebtRow,
     IncomeRow,
@@ -28,6 +29,7 @@ def _clear_user(session: Session, user_id: str) -> None:
     session.exec(delete(IncomeRow).where(IncomeRow.user_id == user_id))
     session.exec(delete(AccountRow).where(AccountRow.user_id == user_id))
     session.exec(delete(CategorizationRuleRow).where(CategorizationRuleRow.user_id == user_id))
+    session.exec(delete(BudgetRow).where(BudgetRow.user_id == user_id))
 
 
 def seed_all() -> None:
@@ -50,12 +52,14 @@ def seed_all() -> None:
                 session.add(income)
             for rule in data.rules:
                 session.add(rule)
+            for budget in data.budgets:
+                session.add(budget)
             session.commit()
 
             print(
                 f"Seeded {user_id}: {len(data.accounts)} accounts, "
                 f"{len(data.transactions)} transactions, {len(data.debts)} debts, "
-                f"{len(data.incomes)} incomes, {len(data.rules)} rules"
+                f"{len(data.incomes)} incomes, {len(data.rules)} rules, {len(data.budgets)} budgets"
             )
 
 

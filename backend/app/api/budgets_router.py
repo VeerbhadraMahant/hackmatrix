@@ -21,6 +21,7 @@ from app.schemas import (
     Budget,
     BudgetCreateRequest,
     BudgetStatus,
+    BudgetUpdateRequest,
     RecurringObligation,
     SafeToSpend,
     TxnCategory,
@@ -48,11 +49,56 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
     return df.sort_values("date").reset_index(drop=True)
 
 
+def _compute_rollover(
+    df: pd.DataFrame, category: str, monthly_limit: float, rollover_cap: float | None, as_of: date
+) -> float:
+    """Compute cumulative unspent budget surplus across prior calendar months up to 12 months back."""
+    if df.empty or monthly_limit <= 0:
+        return 0.0
+
+    surplus_total = 0.0
+    for m_offset in range(1, 13):
+        y = as_of.year
+        m = as_of.month - m_offset
+        while m <= 0:
+            m += 12
+            y -= 1
+
+        month_txns = df[
+            (df["category"] == category)
+            & (df["amount"] < 0)
+            & (df["date"].dt.year == y)
+            & (df["date"].dt.month == m)
+            & (~df["category"].isin(_EXCLUDED_FROM_SPEND))
+        ]
+        any_txns = df[(df["date"].dt.year == y) & (df["date"].dt.month == m)]
+        if any_txns.empty:
+            continue
+
+        month_spent = float(-month_txns["amount"].sum())
+        month_surplus = max(0.0, monthly_limit - month_spent)
+        surplus_total += month_surplus
+
+    if rollover_cap is not None and rollover_cap > 0:
+        return round(min(surplus_total, rollover_cap), 2)
+    return round(surplus_total, 2)
+
+
 @router.get("/budgets/{user_id}", response_model=list[Budget])
 def list_budgets(user_id: str = Depends(resolve_user_id)) -> list[Budget]:
     with Session(engine) as session:
         rows = session.exec(select(BudgetRow).where(BudgetRow.user_id == user_id)).all()
-    return [Budget(id=r.id, user_id=r.user_id, category=r.category, monthly_limit=r.monthly_limit) for r in rows]
+    return [
+        Budget(
+            id=r.id,
+            user_id=r.user_id,
+            category=r.category,
+            monthly_limit=r.monthly_limit,
+            rollover_enabled=bool(r.rollover_enabled),
+            rollover_cap=r.rollover_cap,
+        )
+        for r in rows
+    ]
 
 
 @router.post("/budgets/{user_id}", response_model=Budget)
@@ -66,17 +112,66 @@ def upsert_budget(req: BudgetCreateRequest, user_id: str = Depends(resolve_user_
         ).first()
         if existing is not None:
             existing.monthly_limit = req.monthly_limit
+            existing.rollover_enabled = req.rollover_enabled
+            existing.rollover_cap = req.rollover_cap
             session.add(existing)
             session.commit()
             session.refresh(existing)
             row = existing
         else:
-            row = BudgetRow(user_id=user_id, category=req.category.value, monthly_limit=req.monthly_limit)
+            row = BudgetRow(
+                user_id=user_id,
+                category=req.category.value,
+                monthly_limit=req.monthly_limit,
+                rollover_enabled=req.rollover_enabled,
+                rollover_cap=req.rollover_cap,
+            )
             session.add(row)
             session.commit()
             session.refresh(row)
 
-        return Budget(id=row.id, user_id=row.user_id, category=row.category, monthly_limit=row.monthly_limit)
+        return Budget(
+            id=row.id,
+            user_id=row.user_id,
+            category=row.category,
+            monthly_limit=row.monthly_limit,
+            rollover_enabled=bool(row.rollover_enabled),
+            rollover_cap=row.rollover_cap,
+        )
+
+
+@router.patch("/budgets/{user_id}/{budget_id}", response_model=Budget)
+def patch_budget(
+    budget_id: str,
+    req: BudgetUpdateRequest,
+    user_id: str = Depends(resolve_user_id),
+) -> Budget:
+    with Session(engine) as session:
+        row = session.get(BudgetRow, budget_id)
+        if row is None or row.user_id != user_id:
+            raise HTTPException(404, "Budget not found")
+
+        if req.monthly_limit is not None:
+            if req.monthly_limit < 0:
+                raise HTTPException(400, "monthly_limit must be >= 0")
+            row.monthly_limit = req.monthly_limit
+        if req.rollover_enabled is not None:
+            row.rollover_enabled = req.rollover_enabled
+        if req.rollover_cap is not None:
+            row.rollover_cap = req.rollover_cap
+
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+
+        return Budget(
+            id=row.id,
+            user_id=row.user_id,
+            category=row.category,
+            monthly_limit=row.monthly_limit,
+            rollover_enabled=bool(row.rollover_enabled),
+            rollover_cap=row.rollover_cap,
+        )
 
 
 @router.delete("/budgets/{user_id}/{budget_id}")
@@ -119,8 +214,15 @@ def budget_status(user_id: str = Depends(resolve_user_id)) -> list[BudgetStatus]
     statuses: list[BudgetStatus] = []
     for b in budgets:
         spent = _spent_this_month(df, b.category, today)
+        rollover = (
+            _compute_rollover(df, b.category, b.monthly_limit, b.rollover_cap, today)
+            if b.rollover_enabled
+            else 0.0
+        )
+        effective_limit = b.monthly_limit + rollover
         remaining = b.monthly_limit - spent
-        percent_used = (spent / b.monthly_limit * 100.0) if b.monthly_limit > 0 else (100.0 if spent > 0 else 0.0)
+        total_available = effective_limit - spent
+        percent_used = (spent / effective_limit * 100.0) if effective_limit > 0 else (100.0 if spent > 0 else 0.0)
 
         if percent_used > 100.0:
             health = "over"
@@ -133,10 +235,14 @@ def budget_status(user_id: str = Depends(resolve_user_id)) -> list[BudgetStatus]
             BudgetStatus(
                 category=b.category,
                 monthly_limit=b.monthly_limit,
-                spent_so_far=spent,
-                remaining=remaining,
+                spent_so_far=round(spent, 2),
+                remaining=round(remaining, 2),
                 percent_used=round(percent_used, 1),
                 status=health,
+                rollover_amount=round(rollover, 2),
+                total_available=round(total_available, 2),
+                rollover_enabled=bool(b.rollover_enabled),
+                rollover_cap=b.rollover_cap,
             )
         )
     return statuses

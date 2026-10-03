@@ -23,7 +23,14 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-from app.models import AccountRow, CategorizationRuleRow, DebtRow, IncomeRow, TransactionRow
+from app.models import (
+    AccountRow,
+    BudgetRow,
+    CategorizationRuleRow,
+    DebtRow,
+    IncomeRow,
+    TransactionRow,
+)
 from app.schemas import RecurrenceFrequency, TxnCategory
 
 MONTHS_OF_HISTORY = 12
@@ -105,6 +112,7 @@ class PersonaData:
     debts: list[DebtRow]
     incomes: list[IncomeRow]
     rules: list[CategorizationRuleRow] = field(default_factory=list)
+    budgets: list[BudgetRow] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -428,12 +436,49 @@ def generate_persona(config: PersonaConfig) -> PersonaData:
         ),
     ]
 
+    budgets = [
+        BudgetRow(
+            user_id=config.user_id,
+            category=TxnCategory.dining.value,
+            monthly_limit=12_000,
+            rollover_enabled=True,
+            rollover_cap=6000,
+        ),
+        BudgetRow(
+            user_id=config.user_id,
+            category=TxnCategory.groceries.value,
+            monthly_limit=15_000,
+            rollover_enabled=True,
+            rollover_cap=5000,
+        ),
+        BudgetRow(
+            user_id=config.user_id,
+            category=TxnCategory.transport.value,
+            monthly_limit=8_000,
+            rollover_enabled=True,
+            rollover_cap=3000,
+        ),
+        BudgetRow(
+            user_id=config.user_id,
+            category=TxnCategory.shopping.value,
+            monthly_limit=10_000,
+            rollover_enabled=False,
+        ),
+        BudgetRow(
+            user_id=config.user_id,
+            category=TxnCategory.subscriptions.value,
+            monthly_limit=5_000,
+            rollover_enabled=False,
+        ),
+    ]
+
     return PersonaData(
         accounts=list(accounts_by_key.values()),
         transactions=transactions,
         debts=debts,
         incomes=incomes,
         rules=rules,
+        budgets=budgets,
     )
 
 
