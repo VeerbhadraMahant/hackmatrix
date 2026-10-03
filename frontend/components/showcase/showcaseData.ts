@@ -156,8 +156,22 @@ export interface CollabAccount {
   iconColor: string;
 }
 
-export const COLLABORATE_DATA = {
+export interface CollaborateUser {
+  name: string;
+  initials: string;
+  gradient?: string;
+  avatarSrc?: string;
+}
+
+export interface CollaborateData {
+  users: CollaborateUser[];
+  netWorth: string;
+  accounts: CollabAccount[];
+}
+
+export const COLLABORATE_DATA: CollaborateData = {
   users: [
+
     {
       name: "Jessie",
       initials: "J",

@@ -46,3 +46,8 @@ Thumbs.db
 # supabase local
 supabase/.branches/
 supabase/.temp/
+
+# media & temp assets
+antigravity_pack/
+antigravity_pack.zip
+*.mp4

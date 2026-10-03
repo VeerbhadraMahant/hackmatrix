@@ -1,13 +1,51 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { PLAN_GOALS } from "../showcaseData";
-import { Shield, Palmtree, Car as CarIcon } from "lucide-react";
+import { PLAN_GOALS, type PlanGoal } from "../showcaseData";
+import { api } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
+import { Shield, Palmtree, Car as CarIcon, GraduationCap, Target } from "lucide-react";
 
 export function PlanScene() {
   const shouldReduceMotion = useReducedMotion();
+  const [goals, setGoals] = useState<PlanGoal[]>(PLAN_GOALS);
   const [cycleKey, setCycleKey] = useState(0);
+
+  // Fetch real goals data from backend
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveGoals() {
+      try {
+        const liveGoals = await api.goals("demo-priya");
+        if (liveGoals && liveGoals.length > 0 && isMounted) {
+          const mapped: PlanGoal[] = liveGoals.slice(0, 3).map((gp) => {
+            const g = gp.goal;
+            const coverKey = g.cover_key || "emergency_fund";
+            return {
+              id: g.id,
+              title: g.name,
+              current: `${formatCurrency(g.current_amount)} / ${formatCurrency(g.target_amount)}`,
+              target: formatCurrency(g.target_amount),
+              percent: g.target_amount > 0 ? Math.min(100, Math.round((g.current_amount / g.target_amount) * 100)) : 0,
+              institution: "HDFC Primary Reserve",
+              tag: "Auto-Track Active",
+              image: `/goal-covers/${coverKey}.svg`,
+            };
+          });
+          setGoals(mapped);
+        }
+
+      } catch {
+        // Fallback to static goals
+      }
+    }
+    loadLiveGoals();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (shouldReduceMotion) return;
@@ -20,24 +58,39 @@ export function PlanScene() {
     return () => clearInterval(timer);
   }, [shouldReduceMotion]);
 
-  const getInstitutionLogo = (id: string) => {
-    if (id === "emergency") {
+  const getInstitutionLogo = (title: string) => {
+    const lower = title.toLowerCase();
+    if (lower.includes("emergency") || lower.includes("reserve") || lower.includes("safety")) {
       return (
-        <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
+        <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
           <Shield className="w-3.5 h-3.5" />
         </div>
       );
     }
-    if (id === "vacation") {
+    if (lower.includes("vacation") || lower.includes("travel") || lower.includes("trip")) {
       return (
         <div className="w-6 h-6 rounded-full bg-cyan-700 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
           <Palmtree className="w-3.5 h-3.5" />
         </div>
       );
     }
+    if (lower.includes("car") || lower.includes("ev") || lower.includes("vehicle")) {
+      return (
+        <div className="w-6 h-6 rounded-full bg-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
+          <CarIcon className="w-3.5 h-3.5" />
+        </div>
+      );
+    }
+    if (lower.includes("education") || lower.includes("school")) {
+      return (
+        <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
+          <GraduationCap className="w-3.5 h-3.5" />
+        </div>
+      );
+    }
     return (
       <div className="w-6 h-6 rounded-full bg-rose-600 flex items-center justify-center text-white text-[10px] font-bold shadow-xs">
-        <CarIcon className="w-3.5 h-3.5" />
+        <Target className="w-3.5 h-3.5" />
       </div>
     );
   };
@@ -45,7 +98,7 @@ export function PlanScene() {
   return (
     <div className="relative flex flex-col items-center justify-center w-full max-w-[320px] py-2 select-none min-h-[460px]">
       <div key={cycleKey} className="w-full flex flex-col gap-3.5">
-        {PLAN_GOALS.map((goal, idx) => {
+        {goals.map((goal, idx) => {
           const delay = shouldReduceMotion ? 0 : idx * 0.32;
 
           return (
@@ -65,7 +118,7 @@ export function PlanScene() {
               className="bg-white rounded-[18px] shadow-[0_10px_28px_rgba(26,24,20,0.07)] border border-[#ECE7DF] overflow-hidden"
             >
               {/* Photo Header */}
-              <div className="relative h-22 sm:h-24 w-full bg-[#EAE5DC] overflow-hidden">
+              <div className="relative h-20 sm:h-22 w-full bg-[#EAE5DC] overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={goal.image}
@@ -73,7 +126,6 @@ export function PlanScene() {
                   className="w-full h-full object-cover"
                   loading="eager"
                   onError={(e) => {
-                    // Fallback artistic gradient if offline
                     (e.target as HTMLElement).style.display = "none";
                   }}
                 />
@@ -91,7 +143,7 @@ export function PlanScene() {
                       {goal.current}
                     </div>
                   </div>
-                  <div>{getInstitutionLogo(goal.id)}</div>
+                  <div>{getInstitutionLogo(goal.title)}</div>
                 </div>
 
                 {/* Orange Progress Bar (Frame 12) */}

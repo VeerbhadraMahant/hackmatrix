@@ -2,12 +2,63 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { BUDGET_ITEMS } from "../showcaseData";
-import { ShoppingCart, Utensils, ShoppingBag, Dumbbell } from "lucide-react";
+import { BUDGET_ITEMS, type BudgetItem } from "../showcaseData";
+import { api } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
+import { ShoppingCart, Utensils, ShoppingBag, Car, Film, Sparkles } from "lucide-react";
 
 export function BudgetScene() {
   const shouldReduceMotion = useReducedMotion();
+  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(BUDGET_ITEMS);
   const [cycleKey, setCycleKey] = useState(0);
+
+  // Fetch real budget data from backend
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveBudgets() {
+      try {
+        const statuses = await api.budgetStatus("demo-priya");
+        if (statuses && statuses.length > 0 && isMounted) {
+          const colorMap: Record<string, string> = {
+            dining: "#0D9488",
+            groceries: "#10B981",
+            transport: "#EA580C",
+            shopping: "#D946EF",
+            subscriptions: "#6366F1",
+          };
+
+          const iconMap: Record<string, "grocery" | "dining" | "shopping" | "fitness"> = {
+            groceries: "grocery",
+            dining: "dining",
+            shopping: "shopping",
+            transport: "fitness",
+            subscriptions: "fitness",
+          };
+
+          const mapped: BudgetItem[] = statuses.slice(0, 4).map((bs) => {
+            const cat = String(bs.category).toLowerCase();
+            const effectiveLimit = bs.total_available || (bs.monthly_limit + (bs.rollover_amount || 0));
+            return {
+              id: cat,
+              name: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Envelope`,
+              spent: formatCurrency(bs.spent_so_far),
+              total: formatCurrency(effectiveLimit),
+              percent: Math.min(100, Math.round((bs.spent_so_far / Math.max(1, effectiveLimit)) * 100)),
+              colorClass: colorMap[cat] || "#FF5900",
+              iconType: iconMap[cat] || "grocery",
+            };
+          });
+          setBudgetItems(mapped);
+        }
+      } catch {
+        // Fallback to default mock items
+      }
+    }
+    loadLiveBudgets();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (shouldReduceMotion) return;
@@ -29,7 +80,7 @@ export function BudgetScene() {
       case "shopping":
         return <ShoppingBag className="w-4 h-4 text-fuchsia-600" />;
       case "fitness":
-        return <Dumbbell className="w-4 h-4 text-amber-600" />;
+        return <Car className="w-4 h-4 text-amber-600" />;
       default:
         return <ShoppingCart className="w-4 h-4 text-emerald-600" />;
     }
@@ -38,7 +89,7 @@ export function BudgetScene() {
   return (
     <div className="relative flex flex-col items-center justify-center w-full max-w-[340px] py-4 select-none min-h-[460px]">
       <div key={cycleKey} className="w-full flex flex-col gap-3.5">
-        {BUDGET_ITEMS.map((item, idx) => {
+        {budgetItems.map((item, idx) => {
           const delay = shouldReduceMotion ? 0 : idx * 0.42;
 
           return (
