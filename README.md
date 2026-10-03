@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="frontend/public/logo-horizontal.svg" alt="FinPilot — Autonomous AI Financial Health Copilot" width="380" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/logo-horizontal-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/logo-horizontal.svg">
+    <img alt="FinPilot — Autonomous AI Financial Health Copilot" src="frontend/public/logo-horizontal.svg" width="380">
+  </picture>
 </p>
 
 ### Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine
