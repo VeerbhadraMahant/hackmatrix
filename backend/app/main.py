@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.budgets_router import router as budgets_router
 from app.api.goals_router import router as goals_router
+from app.api.household_router import router as household_router
 from app.api.networth_router import router as networth_router
 from app.api.notifications_router import router as notifications_router
 from app.api.routes import router
@@ -57,6 +58,7 @@ app.include_router(budgets_router, prefix="/api")
 # (unlike routes.py/transactions_router/budgets_router, which rely on the
 # prefix="/api" above) -- no prefix here, or paths would double up.
 app.include_router(goals_router)
+app.include_router(household_router)
 app.include_router(networth_router)
 app.include_router(notifications_router)
 app.include_router(tax_router)
@@ -84,8 +86,9 @@ async def audit_log_middleware(request: Request, call_next):
         # user_id is always the 3rd segment for these resources (even when
         # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
         # or /api/transactions/{user_id}/{transaction_id}).
-        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules"}:
+        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules", "household"}:
             return parts[2]
+
         # For these, user_id is the LAST segment (/api/dashboard/{user_id},
         # /api/alerts/gap/{user_id}, /api/accounts/{user_id}, etc.).
         if parts[1] in {"dashboard", "simulate", "upload", "events", "alerts", "accounts", "notifications"}:

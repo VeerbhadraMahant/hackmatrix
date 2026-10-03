@@ -460,3 +460,79 @@ export interface TaxCalculationRequest {
   other_deductions?: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Household & Collaboration (Pillar 5D)
+// ---------------------------------------------------------------------------
+
+export type HouseholdRole = "owner" | "editor" | "viewer";
+export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
+
+export interface Household {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  created_at: string;
+}
+
+export interface HouseholdMember {
+  id: string;
+  household_id: string;
+  user_id: string;
+  role: HouseholdRole;
+  joined_at: string;
+  display_name?: string;
+  avatar_letter?: string;
+  net_worth?: number;
+}
+
+export interface HouseholdInvite {
+  id: string;
+  household_id: string;
+  invited_email: string;
+  role: HouseholdRole;
+  status: InviteStatus;
+  created_at: string;
+  expires_at: string;
+  invite_link?: string;
+  token?: string;
+}
+
+export interface CreateHouseholdRequest {
+  name: string;
+}
+
+export interface CreateInviteRequest {
+  email: string;
+  role?: HouseholdRole;
+}
+
+export interface AcceptInviteRequest {
+  token: string;
+}
+
+export interface MemberWealthContribution {
+  user_id: string;
+  display_name: string;
+  role: string;
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+  pct_of_household: number;
+}
+
+export interface HouseholdNetWorthSummary {
+  total_net_worth: number;
+  total_assets: number;
+  total_liabilities: number;
+  members_breakdown: MemberWealthContribution[];
+}
+
+export interface HouseholdSummary {
+  household: Household;
+  members: HouseholdMember[];
+  invites: HouseholdInvite[];
+  net_worth_summary: HouseholdNetWorthSummary;
+  user_role: HouseholdRole;
+}
+
+

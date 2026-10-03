@@ -9,6 +9,8 @@ duplicates.
 """
 from __future__ import annotations
 
+import hashlib
+from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, delete, select
 
 from app.core.db import engine, init_db
@@ -18,10 +20,17 @@ from app.models import (
     CategorizationRuleRow,
     DebtRow,
     GoalRow,
+    HouseholdInviteRow,
+    HouseholdMemberRow,
+    HouseholdRow,
     IncomeRow,
     TransactionRow,
 )
 from app.ingest.personas import PERSONA_CONFIGS, generate_persona
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _clear_user(session: Session, user_id: str) -> None:
@@ -32,6 +41,9 @@ def _clear_user(session: Session, user_id: str) -> None:
     session.exec(delete(CategorizationRuleRow).where(CategorizationRuleRow.user_id == user_id))
     session.exec(delete(BudgetRow).where(BudgetRow.user_id == user_id))
     session.exec(delete(GoalRow).where(GoalRow.user_id == user_id))
+    session.exec(delete(HouseholdMemberRow).where(HouseholdMemberRow.user_id == user_id))
+    session.exec(delete(HouseholdRow).where(HouseholdRow.owner_user_id == user_id))
+    session.exec(delete(HouseholdInviteRow).where(HouseholdInviteRow.invited_by_user_id == user_id))
 
 
 def seed_all() -> None:
@@ -66,6 +78,46 @@ def seed_all() -> None:
                 f"{len(data.incomes)} incomes, {len(data.rules)} rules, {len(data.budgets)} budgets, "
                 f"{len(data.goals)} goals"
             )
+
+        # Seed shared household for Priya & Arjun
+        now = datetime.now(timezone.utc)
+        hh = HouseholdRow(
+            id="hh-priya-arjun",
+            name="Priya & Partner Family",
+            owner_user_id="demo-priya",
+            created_at=now - timedelta(days=60),
+        )
+        session.add(hh)
+        session.commit()
+
+        m1 = HouseholdMemberRow(
+            household_id="hh-priya-arjun",
+            user_id="demo-priya",
+            role="owner",
+            joined_at=now - timedelta(days=60),
+        )
+        m2 = HouseholdMemberRow(
+            household_id="hh-priya-arjun",
+            user_id="demo-arjun",
+            role="editor",
+            joined_at=now - timedelta(days=45),
+        )
+        session.add(m1)
+        session.add(m2)
+
+        inv1 = HouseholdInviteRow(
+            household_id="hh-priya-arjun",
+            invited_email="rohan.sharma@example.com",
+            role="editor",
+            token_hash=_hash_token("demo-partner-token-rohan"),
+            status="pending",
+            invited_by_user_id="demo-priya",
+            created_at=now - timedelta(days=2),
+            expires_at=now + timedelta(days=5),
+        )
+        session.add(inv1)
+        session.commit()
+        print("Seeded demo household: 'Priya & Partner Family' (Members: Priya, Arjun; Pending: Rohan)")
 
 
 def seed_if_empty() -> None:

@@ -9,9 +9,15 @@ import type {
   CreateAccountRequest,
   CreateBudgetRequest,
   CreateGoalRequest,
+  CreateHouseholdRequest,
+  CreateInviteRequest,
   DashboardSnapshot,
   Goal,
   GoalProgress,
+  Household,
+  HouseholdInvite,
+  HouseholdSummary,
+
   NetWorthHistory,
   NotificationItem,
   RecomputeDiff,
@@ -185,6 +191,24 @@ export const api = {
   // Notifications
   notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),
 
+  // Household & Collaboration (Pillar 5D)
+  household: (userId: string) => apiFetch<HouseholdSummary>(`/api/household/${userId}`),
+  createHousehold: (userId: string, req: CreateHouseholdRequest) =>
+    apiFetch<HouseholdSummary>(`/api/household/${userId}`, { method: "POST", body: JSON.stringify(req) }),
+  createInvite: (userId: string, req: CreateInviteRequest) =>
+    apiFetch<HouseholdInvite>(`/api/household/${userId}/invites`, { method: "POST", body: JSON.stringify(req) }),
+  acceptInvite: (userId: string, token: string) =>
+    apiFetch<HouseholdSummary>(`/api/household/${userId}/invites/accept`, {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  revokeInvite: (userId: string, inviteId: string) =>
+    apiFetch<{ revoked: boolean; id: string }>(`/api/household/${userId}/invites/${inviteId}`, { method: "DELETE" }),
+  removeMember: (userId: string, memberUserId: string) =>
+    apiFetch<{ removed: boolean; user_id: string }>(`/api/household/${userId}/members/${memberUserId}`, {
+      method: "DELETE",
+    }),
+
   // Tax Optimizer
   taxAnalysis: (userId: string) => apiFetch<TaxOptimizationAnalysis>(`/api/tax/${userId}/analysis`),
   calculateTax: (userId: string, req: TaxCalculationRequest) =>
@@ -193,3 +217,4 @@ export const api = {
       body: JSON.stringify(req),
     }),
 };
+

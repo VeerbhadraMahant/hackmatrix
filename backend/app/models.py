@@ -160,3 +160,43 @@ class AuditLogRow(SQLModel, table=True):
     client_ip: str | None = None
     detail: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
+class HouseholdRow(SQLModel, table=True):
+    """Collaborative household entity linking multiple co-pilots / family members."""
+
+    __tablename__ = "households"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    name: str
+    owner_user_id: str = Field(index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class HouseholdMemberRow(SQLModel, table=True):
+    """Membership join table mapping users to households with role permissions."""
+
+    __tablename__ = "household_members"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    household_id: str = Field(index=True)
+    user_id: str = Field(index=True)
+    role: str = Field(default="editor")  # "owner" | "editor" | "viewer"
+    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class HouseholdInviteRow(SQLModel, table=True):
+    """Secure hashed invitation tokens for inviting partners to a household."""
+
+    __tablename__ = "household_invites"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    household_id: str = Field(index=True)
+    invited_email: str = Field(index=True)
+    role: str = Field(default="editor")  # "editor" | "viewer"
+    token_hash: str = Field(index=True)
+    status: str = Field(default="pending", index=True)  # "pending" | "accepted" | "revoked" | "expired"
+    invited_by_user_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime
+

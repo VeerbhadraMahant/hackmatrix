@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/transactions", label: "Transactions" },
   { href: "/budgets", label: "Budgets" },
   { href: "/goals", label: "Goals" },
+  { href: "/household", label: "Household" },
   { href: "/copilot", label: "Copilot" },
   { href: "/simulate", label: "Simulate" },
   { href: "/tax", label: "Tax" },
@@ -24,6 +25,7 @@ const LINKS = [
   { href: "/statement", label: "Statement" },
   { href: "/security", label: "Security" },
 ];
+
 
 const PERSONA_DETAILS: Record<string, { city: string; tag: string }> = {
   "demo-priya": { city: "Bengaluru", tag: "₹95k/mo" },

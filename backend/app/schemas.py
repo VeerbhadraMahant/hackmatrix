@@ -620,3 +620,90 @@ class TaxCalculationRequest(BaseModel):
     hra_exemption: Optional[float] = None
     other_deductions: Optional[float] = None
 
+
+# ---------------------------------------------------------------------------
+# Household & Co-Piloting Collaboration (Pillar 5D)
+# ---------------------------------------------------------------------------
+
+
+class HouseholdRole(str, Enum):
+    owner = "owner"
+    editor = "editor"
+    viewer = "viewer"
+
+
+class InviteStatus(str, Enum):
+    pending = "pending"
+    accepted = "accepted"
+    revoked = "revoked"
+    expired = "expired"
+
+
+class Household(BaseModel):
+    id: str
+    name: str
+    owner_user_id: str
+    created_at: datetime
+
+
+class HouseholdMember(BaseModel):
+    id: str
+    household_id: str
+    user_id: str
+    role: HouseholdRole
+    joined_at: datetime
+    display_name: Optional[str] = None
+    avatar_letter: Optional[str] = None
+    net_worth: Optional[float] = None
+
+
+class HouseholdInvite(BaseModel):
+    id: str
+    household_id: str
+    invited_email: str
+    role: HouseholdRole
+    status: InviteStatus
+    created_at: datetime
+    expires_at: datetime
+    invite_link: Optional[str] = None
+    token: Optional[str] = None
+
+
+class CreateHouseholdRequest(BaseModel):
+    name: str
+
+
+class CreateInviteRequest(BaseModel):
+    email: str
+    role: HouseholdRole = HouseholdRole.editor
+
+
+class AcceptInviteRequest(BaseModel):
+    token: str
+
+
+class MemberWealthContribution(BaseModel):
+    user_id: str
+    display_name: str
+    role: str
+    assets: float
+    liabilities: float
+    net_worth: float
+    pct_of_household: float
+
+
+class HouseholdNetWorthSummary(BaseModel):
+    total_net_worth: float
+    total_assets: float
+    total_liabilities: float
+    members_breakdown: list[MemberWealthContribution]
+
+
+class HouseholdSummary(BaseModel):
+    household: Household
+    members: list[HouseholdMember]
+    invites: list[HouseholdInvite]
+    net_worth_summary: HouseholdNetWorthSummary
+    user_role: HouseholdRole
+
+
