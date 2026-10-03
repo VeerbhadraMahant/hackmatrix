@@ -13,6 +13,7 @@ import { SankeyDiagram } from "@/components/interactive/SankeyDiagram";
 import { GoalsCards } from "@/components/interactive/GoalsCards";
 import { DeviceMockupSection } from "@/components/interactive/DeviceMockupSection";
 import { InteractiveBentoGrid } from "@/components/interactive/InteractiveBentoGrid";
+import { FeatureShowcase } from "@/components/showcase/FeatureShowcase";
 
 const PREVIEW_ANSWER: AnswerContract = {
   query: "Can I afford to increase my SIP by ₹3,000/month?",
@@ -109,6 +110,11 @@ export default function Home() {
             Three-lane verified insights
           </span>
         </div>
+      </section>
+
+      {/* Feature Showcase (Interactive 3-Column Center Stage) */}
+      <section className="w-full">
+        <FeatureShowcase />
       </section>
 
       {/* COMPONENT 6: Device Mockup Section (Desktop + Phone) */}
